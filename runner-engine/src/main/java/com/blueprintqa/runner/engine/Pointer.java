@@ -186,9 +186,10 @@ public final class Pointer {
 
     public static void settle(WebDriver driver) {
         try {
-            new WebDriverWait(driver, Duration.ofSeconds(4)).until(d ->
-                    "complete".equals(((JavascriptExecutor) d).executeScript("return document.readyState"))
-            );
+            new WebDriverWait(driver, Duration.ofSeconds(4)).until(d -> {
+                Object state = ((JavascriptExecutor) d).executeScript("return document.readyState");
+                return "interactive".equals(state) || "complete".equals(state);
+            });
         } catch (Exception ignored) {
             // a site that never finishes loading can still be acted on; the shot must not be the spinner
         }
@@ -223,7 +224,7 @@ public final class Pointer {
                     const box = center ? center.getBoundingClientRect() : null;
                     const centerText = (center && (center.innerText || center.textContent) || '').trim();
                     const tinyCenter = !!(box && box.width < 120 && box.height < 80 && centerText.length < 4);
-                    const busy = !!document.querySelector('[aria-busy="true"], [class*="skeleton" i], [class*="Spinner" i], [class*="loading" i]');
+                    const busy = document.body && document.body.getAttribute('aria-busy') === 'true';
                     if (text.length < 40) return false;
                     if (tinyCenter && mainText.length < 40) return false;
                     if (busy && mainText.length < 80) return false;
