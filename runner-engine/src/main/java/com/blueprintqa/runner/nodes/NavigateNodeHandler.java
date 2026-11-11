@@ -28,7 +28,7 @@ public class NavigateNodeHandler implements NodeHandler {
         int timeout = Math.max(5, node.integer("timeoutSeconds", 30));
         context.driver().manage().timeouts().pageLoadTimeout(Duration.ofSeconds(timeout));
         Exception last = null;
-        for (int attempt = 1; attempt <= 3; attempt++) {
+        for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 context.driver().navigate().to(url);
                 new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(driver -> {
@@ -39,7 +39,7 @@ public class NavigateNodeHandler implements NodeHandler {
                 break;
             } catch (Exception ex) {
                 last = ex;
-                if (attempt == 3) {
+                if (attempt == 2) {
                     throw new IllegalStateException("Open page failed for " + url + ": " + ex.getMessage(), ex);
                 }
             }

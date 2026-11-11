@@ -26,6 +26,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
   const [error, setError] = useState("");
   const [element, setElement] = useState<InspectElement | null>(null);
   const [locked, setLocked] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const timer = useRef<number | null>(null);
   const sessionId = useRef("");
@@ -37,7 +38,20 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
     setError("");
     setElement(null);
     setLocked(false);
-    api.inspectStart({ nodes, edges, stop_before: stopBefore || undefined }).then((result) => {
+    const payload = {
+      nodes: nodes.map((node) => {
+        const item = node as { id?: string; type?: string; position?: { x: number; y: number }; data?: Record<string, unknown> };
+        const data = { ...(item.data || {}) };
+        delete data.runStatus;
+        return { id: item.id, type: item.type || data.nodeType, position: item.position, data };
+      }),
+      edges: edges.map((edge) => {
+        const item = edge as { source?: string; target?: string; sourceHandle?: string; targetHandle?: string };
+        return { source: item.source, target: item.target, sourceHandle: item.sourceHandle, targetHandle: item.targetHandle };
+      }),
+      stop_before: stopBefore || undefined,
+    };
+    api.inspectStart(payload).then((result) => {
       if (cancelled) {
         if (result.session_id) api.inspectClose(result.session_id).catch(() => undefined);
         return;
@@ -46,7 +60,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
       sessionId.current = result.session_id;
       if (!result.ok) setError(result.error || "Could not open the page");
     }).catch((err: Error) => {
-      if (!cancelled) setError(err.message);
+      if (!cancelled) setError(err.message === "Failed to fetch" ? "The page took too long to open, or the studio lost the runner. Try again." : err.message);
     }).finally(() => {
       if (!cancelled) setBusy(false);
     });
@@ -55,7 +69,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
       if (sessionId.current) api.inspectClose(sessionId.current).catch(() => undefined);
       sessionId.current = "";
     };
-  }, [open, stopBefore]);
+  }, [open, stopBefore, attempt]);
 
   if (!open) return null;
   const viewport = session?.viewport || {};
@@ -95,7 +109,12 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
         <div className="grid min-h-0 flex-1 grid-cols-[1fr_300px]">
           <div className="overflow-auto bg-[#070d14] p-3">
             {busy && <p className="text-sm text-[#8ea6bb]">Opening the page in its current state...</p>}
-            {error && <p className="text-sm text-[#ff8fa3]">{error}</p>}
+            {error && (
+              <div className="mb-3">
+                <p className="text-sm text-[#ff8fa3]">{error}</p>
+                <button className="btn mt-2" onClick={() => setAttempt((value) => value + 1)}>Try again</button>
+              </div>
+            )}
             {session?.screenshot_base64 && (
               <div className="relative inline-block">
                 <img

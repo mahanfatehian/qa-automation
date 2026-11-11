@@ -72,10 +72,39 @@ public class DagExecutorService {
 
     public WebDriver openContext(WorkflowJob job, String stopBefore) {
         GraphNode start = job.start();
-        WebDriver driver = selenium.open(start, "inspect", 2);
+        WebDriver driver = selenium.open(start, "inspect", 1);
         sessions.add(driver);
-        replayNode(start, job, new ExecutionContext(driver, job.variables), stopBefore, new int[]{0});
+        driver.manage().timeouts().pageLoadTimeout(java.time.Duration.ofSeconds(20));
+        try {
+            replayNode(start, job, new ExecutionContext(driver, job.variables), stopBefore, new int[]{0});
+        } catch (Exception ex) {
+            if (driver.getCurrentUrl() == null || driver.getCurrentUrl().startsWith("data:")) {
+                throw ex;
+            }
+        }
+        String current = driver.getCurrentUrl();
+        if (current == null || current.isBlank() || current.startsWith("data:")) {
+            String url = firstUrl(job);
+            if (!url.isBlank()) {
+                driver.navigate().to(url);
+            }
+        }
         return driver;
+    }
+
+    private String firstUrl(WorkflowJob job) {
+        if (job.nodes == null) {
+            return "";
+        }
+        for (GraphNode node : job.nodes) {
+            if (node != null && "NAVIGATE".equals(node.semanticType())) {
+                String url = node.str("url", "");
+                if (!url.isBlank()) {
+                    return url;
+                }
+            }
+        }
+        return "";
     }
 
     private void replayNode(GraphNode node, WorkflowJob job, ExecutionContext context, String stopBefore, int[] steps) {
