@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
 import org.openqa.selenium.WebElement;
@@ -22,10 +23,7 @@ public class SearchElementNodeHandler implements NodeHandler {
 
     @Override
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
-        String strategy = node.str("strategy", "XPATH");
-        String query = context.interpolate(node.str("query", ""));
-        int timeout = node.integer("timeoutSeconds", 10);
-        WebElement element = finder.find(context.driver(), strategy, query, timeout);
+        WebElement element = StepTargets.find(node, context, finder, "Find needs a selector. Use Select on page, or type a CSS, XPath, or text query.");
         NodeOutput output = NodeOutput.pass("Element found");
         output.pins.put("element_out", element);
         return output;

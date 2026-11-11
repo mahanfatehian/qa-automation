@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
 import org.openqa.selenium.ElementNotInteractableException;
@@ -24,14 +25,7 @@ public class ClickNodeHandler implements NodeHandler {
 
     @Override
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
-        WebElement element = context.elementInput();
-        if (element == null) {
-            String query = context.interpolate(node.str("xpath", node.str("query", "")));
-            if (query == null || query.isBlank()) {
-                throw new IllegalArgumentException("Click needs an element pin or an XPath");
-            }
-            element = finder.find(context.driver(), node.str("strategy", "XPATH"), query, node.integer("timeoutSeconds", 10));
-        }
+        WebElement element = StepTargets.require(node, context, finder);
         JavascriptExecutor js = (JavascriptExecutor) context.driver();
         js.executeScript("arguments[0].scrollIntoView({block:'center', inline:'nearest'});", element);
         if (node.bool("forceJsClick", false)) {

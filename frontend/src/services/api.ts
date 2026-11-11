@@ -55,6 +55,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ x, y }),
     }),
+  inspectResolve: (sessionId: string, element: InspectElement) =>
+    request<{ ok: boolean; selectors: Array<{ kind: string; value: string; rank?: number }> }>(`/api/v1/tools/inspect/${sessionId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({
+        path: element.path || [],
+        tag: element.tag,
+        id: element.id,
+        name: element.name,
+        text: element.text,
+        aria: element.aria,
+        placeholder: element.placeholder,
+        type: element.type,
+      }),
+    }),
   inspectClose: (sessionId: string) => request<void>(`/api/v1/tools/inspect/${sessionId}/close`, { method: "POST" }),
 };
 
@@ -74,6 +88,7 @@ export type InspectElement = {
   options: Array<{ text: string; value: string }>;
   selectors: Array<{ kind: string; value: string }>;
   suggested: string[];
+  path?: Array<Record<string, unknown>>;
 };
 
 export type InspectSession = {

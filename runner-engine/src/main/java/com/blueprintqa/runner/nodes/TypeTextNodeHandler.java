@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
 import org.openqa.selenium.JavascriptExecutor;
@@ -24,14 +25,7 @@ public class TypeTextNodeHandler implements NodeHandler {
 
     @Override
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
-        WebElement element = context.elementInput();
-        if (element == null) {
-            String query = context.interpolate(node.str("xpath", node.str("query", "")));
-            if (query == null || query.isBlank()) {
-                throw new IllegalArgumentException("Type needs an element pin or an XPath");
-            }
-            element = finder.find(context.driver(), node.str("strategy", "XPATH"), query, node.integer("timeoutSeconds", 10));
-        }
+        WebElement element = StepTargets.require(node, context, finder);
         String text = context.textInput();
         if (text == null) {
             text = context.interpolate(node.str("text", ""));
@@ -39,9 +33,14 @@ public class TypeTextNodeHandler implements NodeHandler {
         if (text == null) {
             text = "";
         }
-        ((JavascriptExecutor) context.driver()).executeScript("arguments[0].scrollIntoView({block:'center'});", element);
+        JavascriptExecutor js = (JavascriptExecutor) context.driver();
+        js.executeScript("arguments[0].scrollIntoView({block:'center'}); arguments[0].focus();", element);
         if (node.bool("clearFirst", true)) {
-            element.clear();
+            try {
+                element.clear();
+            } catch (Exception ex) {
+                element.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.DELETE);
+            }
         }
         element.sendKeys(text);
         if (node.bool("pressEnter", false)) {

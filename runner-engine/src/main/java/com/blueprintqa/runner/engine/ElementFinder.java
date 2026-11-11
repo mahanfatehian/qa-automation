@@ -14,6 +14,24 @@ import java.util.Locale;
 
 @Component
 public class ElementFinder {
+    private static final String CSS_SCRIPT = """
+            const selector = String(arguments[0] || '');
+            const walk = (root) => {
+              if (!root || !root.querySelector) return null;
+              let found = null;
+              try { found = root.querySelector(selector); } catch (e) { return null; }
+              if (found) return found;
+              const nodes = root.querySelectorAll('*');
+              for (const node of nodes) {
+                if (!node.shadowRoot) continue;
+                const inner = walk(node.shadowRoot);
+                if (inner) return inner;
+              }
+              return null;
+            };
+            return walk(document);
+            """;
+
     private static final String TEXT_SCRIPT = """
             const needle = String(arguments[0] || '').toLowerCase();
             const all = document.body ? document.body.querySelectorAll('*') : [];
@@ -49,6 +67,9 @@ public class ElementFinder {
         String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
         int timeout = Math.max(1, timeoutSeconds);
         try {
+            if ("CSS".equals(kind)) {
+                return waitJs(driver, timeout, CSS_SCRIPT, query);
+            }
             By by = by(kind, query);
             if (by == null) {
                 return switch (kind) {

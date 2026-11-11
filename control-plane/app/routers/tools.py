@@ -2,9 +2,11 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from app.config import settings
-from app.schemas import InspectHoverIn, InspectStartIn, PickIn, ProbeIn
+from app.schemas import InspectHoverIn, InspectResolveIn, InspectStartIn, PickIn, ProbeIn
+from app.selector import synthesize
 
 router = APIRouter(prefix="/api/v1/tools", tags=["tools"])
+_html_cache: dict[str, str] = {}
 
 
 @router.post("/inspect/start")
@@ -46,13 +48,42 @@ async def inspect_hover(session_id: str, body: InspectHoverIn) -> dict:
     return {"ok": bool(data.get("ok")), "element": data.get("element"), "error": data.get("error")}
 
 
+@router.post("/inspect/{session_id}/resolve")
+async def inspect_resolve(session_id: str, body: InspectResolveIn) -> dict:
+    html = await _cached_html(session_id, refresh=False)
+    selectors = synthesize(html, body.model_dump())
+    if not selectors:
+        html = await _cached_html(session_id, refresh=True)
+        selectors = synthesize(html, body.model_dump())
+    return {"ok": bool(selectors), "selectors": selectors}
+
+
+async def _cached_html(session_id: str, refresh: bool) -> str:
+    if not refresh and session_id in _html_cache:
+        return _html_cache[session_id]
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                f"{settings.runner_url.rstrip('/')}/internal/inspect/{session_id}/source",
+                json={"refresh": refresh},
+            )
+            html = str(response.json().get("html") or "")
+    except httpx.HTTPError:
+        return _html_cache.get(session_id, "")
+    if html:
+        _html_cache[session_id] = html
+    return html
+
+
 @router.post("/inspect/{session_id}/close")
 async def inspect_close(session_id: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             await client.post(f"{settings.runner_url.rstrip('/')}/internal/inspect/{session_id}/close")
     except httpx.HTTPError:
+        _html_cache.pop(session_id, None)
         return {"ok": False}
+    _html_cache.pop(session_id, None)
     return {"ok": True}
 
 

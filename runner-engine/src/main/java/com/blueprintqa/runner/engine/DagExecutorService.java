@@ -135,21 +135,22 @@ public class DagExecutorService {
         resolveInputs(node, job, context);
         long started = System.nanoTime();
         telemetry.publish(job, "NODE_RUNNING", node.id, node.semanticType(), 0, "", "", Map.of(), "");
+        NodeOutput output;
         try {
             if ("LOOP_ELEMENTS".equals(node.semanticType())) {
                 runLoop(node, job, context, steps, started);
                 return;
             }
-            NodeOutput output = registry.get(node.semanticType()).execute(node, context);
-            store(node, output, context);
-            telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), output.message, "", telemetry.safe(output.pins), screenshot(context.driver()));
-            String handle = output.nextExec == null || output.nextExec.isBlank() ? "exec_out" : output.nextExec;
-            for (GraphNode next : successors(job, node.id, handle)) {
-                runNode(next, job, context, steps);
-            }
+            output = registry.get(node.semanticType()).execute(node, context);
         } catch (Exception ex) {
             telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), friendly(ex), stack(ex), Map.of(), screenshot(context.driver()));
             throw new IllegalStateException(where(context) + friendly(ex), ex);
+        }
+        store(node, output, context);
+        telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), output.message, "", telemetry.safe(output.pins), screenshot(context.driver()));
+        String handle = output.nextExec == null || output.nextExec.isBlank() ? "exec_out" : output.nextExec;
+        for (GraphNode next : successors(job, node.id, handle)) {
+            runNode(next, job, context, steps);
         }
     }
 

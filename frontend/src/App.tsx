@@ -283,19 +283,20 @@ export function App() {
         edges={edges}
         stopBefore={pickNodeId}
         onClose={() => setPickOpen(false)}
-        onUse={(stepType, strategy, query) => {
+        onUse={(stepType, strategy, query, selectors) => {
           if (!pickNodeId) return;
           setDirty(true);
+          const picked = { strategy, query, xpath: query, selectors };
           const current = nodes.find((node) => node.id === pickNodeId);
           if (current && current.data.nodeType === stepType) {
-            setNodes((items) => items.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, strategy, query, xpath: query } } : node));
+            setNodes((items) => items.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, ...picked } } : node));
           } else if (current) {
             const id = `n_${crypto.randomUUID().slice(0, 8)}`;
             setNodes((items) => items.concat({
               id,
               type: stepType,
               position: { x: current.position.x + 280, y: current.position.y },
-              data: { nodeType: stepType, strategy, query, xpath: query },
+              data: { nodeType: stepType, ...picked },
             }));
             setEdges((items) => items.concat({
               id: `e_${id}`,

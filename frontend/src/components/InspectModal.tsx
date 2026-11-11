@@ -7,7 +7,7 @@ type Props = {
   edges: unknown[];
   stopBefore: string | null;
   onClose: () => void;
-  onUse: (stepType: string, strategy: string, query: string) => void;
+  onUse: (stepType: string, strategy: string, query: string, selectors: Array<{ kind: string; value: string }>) => void;
 };
 
 const labels: Record<string, string> = {
@@ -26,6 +26,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
   const [error, setError] = useState("");
   const [element, setElement] = useState<InspectElement | null>(null);
   const [locked, setLocked] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const timer = useRef<number | null>(null);
@@ -89,10 +90,22 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
     }, 120);
   }
 
+  function lock() {
+    if (!element || !sessionId.current) return;
+    setLocked(true);
+    setResolving(true);
+    api.inspectResolve(sessionId.current, element).then((result) => {
+      if (result.selectors?.length) {
+        setElement((current) => current ? { ...current, selectors: result.selectors } : current);
+      }
+    }).catch(() => undefined).finally(() => setResolving(false));
+  }
+
   function choose(stepType: string) {
-    const selector = element?.selectors[0];
+    const selectors = element?.selectors || [];
+    const selector = selectors[0];
     if (!selector) return;
-    onUse(stepType, selector.kind, selector.value);
+    onUse(stepType, selector.kind, selector.value, selectors);
     onClose();
   }
 
@@ -123,7 +136,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
                   className="max-w-full cursor-crosshair"
                   src={`data:image/png;base64,${session.screenshot_base64}`}
                   onMouseMove={move}
-                  onClick={() => element && setLocked(true)}
+                  onClick={lock}
                 />
                 {element && (
                   <div
@@ -150,10 +163,10 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
                     {element.options.slice(0, 8).map((option) => <li key={option.value}>{option.text}</li>)}
                   </ul>
                 )}
-                <p className="mt-3 font-mono text-[11px] text-[#8ea6bb]">{element.selectors[0]?.kind} {element.selectors[0]?.value}</p>
+                <p className="mt-3 font-mono text-[11px] text-[#8ea6bb]">{resolving ? "Building a stable path..." : `${element.selectors[0]?.kind || ""} ${element.selectors[0]?.value || ""}`}</p>
                 <div className="mt-3 flex flex-col gap-2">
                   {(element.suggested || []).map((step) => (
-                    <button key={step} className="btn text-left" onClick={() => choose(step)}>{labels[step] || step}</button>
+                    <button key={step} className="btn text-left" disabled={resolving} onClick={() => choose(step)}>{labels[step] || step}</button>
                   ))}
                 </div>
               </>

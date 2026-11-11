@@ -98,6 +98,17 @@ class InspectHoverIn(BaseModel):
     y: int
 
 
+class InspectResolveIn(BaseModel):
+    path: list = Field(default_factory=list)
+    tag: str = ""
+    id: str = ""
+    name: str = ""
+    text: str = ""
+    aria: str = ""
+    placeholder: str = ""
+    type: str = ""
+
+
 class PickIn(BaseModel):
     url: str
     browser: str = "chrome"

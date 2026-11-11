@@ -38,6 +38,12 @@ public class InspectController {
               if (area > 8 && area < bestArea) { node = candidate; bestArea = area; }
             }
             if (!node) return null;
+            let pierce = 0;
+            while (node.shadowRoot && pierce++ < 5) {
+              const inner = node.shadowRoot.elementFromPoint(x, y);
+              if (!inner || inner === node) break;
+              node = inner;
+            }
             const interesting = (n) => {
               const tag = n.tagName.toLowerCase();
               const type = (n.getAttribute('type') || '').toLowerCase();
@@ -80,12 +86,36 @@ public class InspectController {
             if (kind === 'button' || kind === 'link') suggested.push('CLICK');
             if (kind === 'file') suggested.push('UPLOAD');
             suggested.push('VERIFY', 'SEARCH_ELEMENT');
+            const path = [];
+            let cursor = node;
+            let depth = 0;
+            while (cursor && cursor.tagName && cursor.tagName !== 'HTML' && depth++ < 12) {
+              const root = cursor.getRootNode && cursor.getRootNode();
+              const parent = cursor.parentElement || (root && root.host) || null;
+              let nth = 1;
+              if (parent) {
+                const kids = parent.shadowRoot && !cursor.parentElement ? [...parent.shadowRoot.children] : [...parent.children];
+                nth = Math.max(1, kids.filter((child) => child.tagName === cursor.tagName).indexOf(cursor) + 1);
+              }
+              path.unshift({
+                tag: cursor.tagName.toLowerCase(),
+                nth,
+                id: cursor.id || '',
+                name: cursor.getAttribute('name') || '',
+                testid: cursor.getAttribute('data-testid') || cursor.getAttribute('data-test') || cursor.getAttribute('data-cy') || cursor.getAttribute('data-qa') || '',
+                type: (cursor.getAttribute('type') || '').toLowerCase(),
+                aria: cursor.getAttribute('aria-label') || '',
+                placeholder: cursor.getAttribute('placeholder') || '',
+                role: cursor.getAttribute('role') || ''
+              });
+              cursor = parent;
+            }
             return {
               tag, type, kind, text, name: name || '', id: node.id || '',
               placeholder: node.getAttribute('placeholder') || '',
               aria: node.getAttribute('aria-label') || '',
               x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-              options, selectors, suggested
+              options, selectors, suggested, path
             };
             """;
 
@@ -116,7 +146,13 @@ public class InspectController {
             job.maxSteps = 80;
             driver = executor.openContext(job, text(body.get("stopBefore")));
             String id = UUID.randomUUID().toString();
-            held.put(id, new Held(driver, System.currentTimeMillis()));
+            String html = "";
+            try {
+                html = driver.getPageSource();
+            } catch (Exception ignored) {
+                html = "";
+            }
+            held.put(id, new Held(driver, System.currentTimeMillis(), html));
             Map<String, Object> result = shot(driver);
             result.put("ok", true);
             result.put("sessionId", id);
@@ -147,6 +183,26 @@ public class InspectController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ok", true);
         result.put("element", described);
+        return result;
+    }
+
+    @PostMapping("/internal/inspect/{id}/source")
+    public Map<String, Object> source(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
+        Held session = fresh(id);
+        if (session == null) {
+            return Map.of("ok", false, "error", "Selection session expired");
+        }
+        boolean refresh = body != null && Boolean.TRUE.equals(body.get("refresh"));
+        if (refresh || session.pageSource == null || session.pageSource.isBlank()) {
+            try {
+                session.pageSource = session.driver.getPageSource();
+            } catch (Exception ex) {
+                return Map.of("ok", false, "error", ex.getMessage() == null ? "Could not cache the page" : ex.getMessage());
+            }
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ok", true);
+        result.put("html", session.pageSource);
         return result;
     }
 
@@ -223,10 +279,12 @@ public class InspectController {
     private static final class Held {
         private final WebDriver driver;
         private long touched;
+        private String pageSource;
 
-        private Held(WebDriver driver, long touched) {
+        private Held(WebDriver driver, long touched, String pageSource) {
             this.driver = driver;
             this.touched = touched;
+            this.pageSource = pageSource;
         }
     }
 }
