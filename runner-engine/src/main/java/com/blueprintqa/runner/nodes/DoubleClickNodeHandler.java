@@ -27,6 +27,8 @@ public class DoubleClickNodeHandler implements NodeHandler {
         var element = StepTargets.require(node, context, finder);
         Pointer.aim(context.driver(), element);
         new Actions(context.driver()).doubleClick(element).perform();
+        Pointer.settle(context.driver());
+        context.invalidateElements();
         return NodeOutput.pass("Double clicked");
     }
 }

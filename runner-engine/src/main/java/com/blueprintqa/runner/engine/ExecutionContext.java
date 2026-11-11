@@ -14,8 +14,11 @@ public class ExecutionContext {
     private final WebDriver driver;
     private final Map<String, Object> variables;
     private final Map<String, Map<String, Object>> pins = new HashMap<>();
+    private final Map<String, Long> pinGeneration = new HashMap<>();
     private final Map<String, Object> inputs = new HashMap<>();
+    private final Map<String, Long> inputGeneration = new HashMap<>();
     private String branch = "";
+    private long documentGeneration = 0;
 
     public ExecutionContext(WebDriver driver, Map<String, Object> variables) {
         this.driver = driver;
@@ -28,6 +31,10 @@ public class ExecutionContext {
 
     public String branch() {
         return branch;
+    }
+
+    public long documentGeneration() {
+        return documentGeneration;
     }
 
     public synchronized ExecutionContext fork(WebDriver next, String branchName) {
@@ -44,13 +51,27 @@ public class ExecutionContext {
         return copy;
     }
 
+    public void invalidateElements() {
+        documentGeneration++;
+        inputs.entrySet().removeIf(entry -> entry.getValue() instanceof WebElement);
+        inputGeneration.clear();
+        for (Map<String, Object> nodePins : pins.values()) {
+            nodePins.entrySet().removeIf(entry -> entry.getValue() instanceof WebElement);
+        }
+        pinGeneration.clear();
+    }
+
     public void clearInputs() {
         inputs.clear();
+        inputGeneration.clear();
     }
 
     public void putInput(String handle, Object value) {
         if (handle != null && value != null) {
             inputs.put(handle, value);
+            if (value instanceof WebElement) {
+                inputGeneration.put(handle, documentGeneration);
+            }
         }
     }
 
@@ -58,16 +79,16 @@ public class ExecutionContext {
         return inputs.get(handle);
     }
 
+    public boolean elementInputCurrent() {
+        return fresh("element_in") != null || fresh("current_element") != null;
+    }
+
     public WebElement elementInput() {
-        Object direct = inputs.get("element_in");
-        if (direct instanceof WebElement element) {
-            return element;
+        WebElement direct = fresh("element_in");
+        if (direct != null) {
+            return direct;
         }
-        Object current = inputs.get("current_element");
-        if (current instanceof WebElement element) {
-            return element;
-        }
-        return null;
+        return fresh("current_element");
     }
 
     public ElementRef elementRef() {
@@ -92,6 +113,9 @@ public class ExecutionContext {
 
     public void setPin(String nodeId, String handle, Object value) {
         pins.computeIfAbsent(nodeId, ignored -> new HashMap<>()).put(handle, value);
+        if (value instanceof WebElement) {
+            pinGeneration.put(pinKey(nodeId, handle), documentGeneration);
+        }
     }
 
     public Object getPin(String nodeId, String handle) {
@@ -99,7 +123,11 @@ public class ExecutionContext {
         if (nodePins == null) {
             return null;
         }
-        return nodePins.get(handle);
+        Object value = nodePins.get(handle);
+        if (value instanceof WebElement && pinGeneration.getOrDefault(pinKey(nodeId, handle), -1L) != documentGeneration) {
+            return null;
+        }
+        return value;
     }
 
     public void setVariable(String name, Object value) {
@@ -125,5 +153,21 @@ public class ExecutionContext {
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    private WebElement fresh(String handle) {
+        Object value = inputs.get(handle);
+        if (!(value instanceof WebElement element)) {
+            return null;
+        }
+        Long stamped = inputGeneration.get(handle);
+        if (stamped == null || stamped != documentGeneration) {
+            return null;
+        }
+        return element;
+    }
+
+    private static String pinKey(String nodeId, String handle) {
+        return nodeId + "\0" + handle;
     }
 }

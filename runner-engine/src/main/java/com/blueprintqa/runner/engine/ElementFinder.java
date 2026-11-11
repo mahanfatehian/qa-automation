@@ -36,33 +36,55 @@ public class ElementFinder {
 
     private static final String TEXT_SCRIPT = """
             const needle = String(arguments[0] || '').toLowerCase();
-            const all = document.body ? document.body.querySelectorAll('*') : [];
-            let best = null;
-            let bestLen = Infinity;
-            for (const el of all) {
-              const text = (el.innerText || '').trim().toLowerCase();
-              if (!text || !text.includes(needle)) continue;
-              if (text.length < bestLen) { best = el; bestLen = text.length; }
-            }
-            return best;
+            const state = { el: null, len: Infinity };
+            const visit = (root) => {
+              if (!root || !root.querySelectorAll) return;
+              for (const el of root.querySelectorAll('*')) {
+                const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+                if (text && text.includes(needle) && text.length < state.len) {
+                  state.el = el;
+                  state.len = text.length;
+                }
+                if (el.shadowRoot) visit(el.shadowRoot);
+              }
+            };
+            visit(document);
+            return state.el;
             """;
 
     private static final String REGEX_SCRIPT = """
             let re;
             try { re = new RegExp(String(arguments[0] || ''), 'i'); }
             catch (e) { return null; }
-            const all = document.body ? document.body.querySelectorAll('*') : [];
-            let best = null;
-            let bestLen = Infinity;
-            for (const el of all) {
-              const text = (el.innerText || '').trim();
-              if (!text || !re.test(text)) continue;
-              if (text.length < bestLen) { best = el; bestLen = text.length; }
-            }
-            return best;
+            const state = { el: null, len: Infinity };
+            const visit = (root) => {
+              if (!root || !root.querySelectorAll) return;
+              for (const el of root.querySelectorAll('*')) {
+                const text = (el.innerText || el.textContent || '').trim();
+                if (text && re.test(text) && text.length < state.len) {
+                  state.el = el;
+                  state.len = text.length;
+                }
+                if (el.shadowRoot) visit(el.shadowRoot);
+              }
+            };
+            visit(document);
+            return state.el;
             """;
 
     public WebElement find(WebDriver driver, String strategy, String query, int timeoutSeconds) {
+        try {
+            return findOnce(driver, strategy, query, timeoutSeconds);
+        } catch (RuntimeException ex) {
+            if (ex instanceof IllegalArgumentException || documentComplete(driver)) {
+                throw ex;
+            }
+            Pointer.settle(driver);
+            return findOnce(driver, strategy, query, timeoutSeconds);
+        }
+    }
+
+    public WebElement findOnce(WebDriver driver, String strategy, String query, int timeoutSeconds) {
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("This step needs a selector or search text");
         }
@@ -84,9 +106,18 @@ public class ElementFinder {
                     default -> throw new IllegalArgumentException("Unknown search strategy " + strategy);
                 };
             }
-            return wait(driver, timeout).until(ExpectedConditions.presenceOfElementLocated(by));
+            return wait(driver, timeout).until(ExpectedConditions.elementToBeClickable(by));
         } catch (TimeoutException ex) {
             throw new IllegalStateException("Could not find " + kind + " `" + query + "` within " + timeout + "s", ex);
+        }
+    }
+
+    public boolean documentComplete(WebDriver driver) {
+        try {
+            Object state = ((JavascriptExecutor) driver).executeScript("return document.readyState");
+            return "complete".equals(state);
+        } catch (RuntimeException ex) {
+            return false;
         }
     }
 
@@ -113,6 +144,14 @@ public class ElementFinder {
         return driver.findElements(by).size();
     }
 
+    private boolean interactable(WebElement element) {
+        try {
+            return element.isDisplayed() && element.isEnabled();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
     private WebDriverWait wait(WebDriver driver, int timeout) {
         return new WebDriverWait(driver, Duration.ofSeconds(timeout));
     }
@@ -120,7 +159,10 @@ public class ElementFinder {
     private WebElement waitJs(WebDriver driver, int timeout, String script, String query) {
         return wait(driver, timeout).until(webDriver -> {
             Object found = ((JavascriptExecutor) webDriver).executeScript(script, query);
-            return found instanceof WebElement element ? element : null;
+            if (!(found instanceof WebElement element) || !interactable(element)) {
+                return null;
+            }
+            return element;
         });
     }
 }

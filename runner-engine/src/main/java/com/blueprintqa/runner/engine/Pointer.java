@@ -14,8 +14,13 @@ public final class Pointer {
     }
 
     public static String click(WebDriver driver, WebElement element) {
+        return click(driver, element, null);
+    }
+
+    public static String click(WebDriver driver, WebElement element, ExecutionContext context) {
         String before = url(driver);
         long beforeMut = mark(driver);
+        boolean beforeChecked = checked(driver, element);
         scroll(driver, element);
         aim(driver, element);
         try {
@@ -32,12 +37,12 @@ public final class Pointer {
         } catch (Exception ex) {
             jsClick(driver, element);
         }
-        if (changed(driver, before, beforeMut)) {
-            return "Clicked";
+        if (changed(driver, element, before, beforeMut, beforeChecked)) {
+            return accepted(driver, before, context);
         }
         jsClick(driver, element);
-        if (changed(driver, before, beforeMut)) {
-            return "Clicked";
+        if (changed(driver, element, before, beforeMut, beforeChecked)) {
+            return accepted(driver, before, context);
         }
         throw new IllegalStateException("Click did not land. The control was found, but the page did not react.");
     }
@@ -90,9 +95,13 @@ public final class Pointer {
     }
 
     public static boolean check(WebDriver driver, WebElement element, boolean want) {
+        return check(driver, element, want, null);
+    }
+
+    public static boolean check(WebDriver driver, WebElement element, boolean want, ExecutionContext context) {
         ready(driver);
         if (element.isSelected() != want) {
-            click(driver, element);
+            click(driver, element, context);
         }
         if (element.isSelected() != want) {
             throw new IllegalStateException(want ? "Check did not land." : "Uncheck did not land.");
@@ -231,15 +240,20 @@ public final class Pointer {
         return value instanceof Number number ? number.longValue() : 0L;
     }
 
-    private static boolean changed(WebDriver driver, String before, long beforeMut) {
+    private static String accepted(WebDriver driver, String before, ExecutionContext context) {
+        if (ClickLanding.urlChanged(before, url(driver))) {
+            settle(driver);
+        }
+        if (context != null) {
+            context.invalidateElements();
+        }
+        return "Clicked";
+    }
+
+    private static boolean changed(WebDriver driver, WebElement element, String before, long beforeMut, boolean beforeChecked) {
         long start = System.currentTimeMillis();
         while (System.currentTimeMillis() - start < 1200L) {
-            if (!url(driver).equals(before)) {
-                return true;
-            }
-            Object value = ((JavascriptExecutor) driver).executeScript("return window.__bpMut || 0");
-            long now = value instanceof Number number ? number.longValue() : 0L;
-            if (now > beforeMut) {
+            if (reacted(driver, element, before, beforeMut, beforeChecked)) {
                 return true;
             }
             try {
@@ -249,7 +263,38 @@ public final class Pointer {
                 return false;
             }
         }
-        return !url(driver).equals(before);
+        return reacted(driver, element, before, beforeMut, beforeChecked);
+    }
+
+    private static boolean reacted(WebDriver driver, WebElement element, String before, long beforeMut, boolean beforeChecked) {
+        return ClickLanding.landed(before, url(driver), beforeMut, mutation(driver), beforeChecked, checked(driver, element));
+    }
+
+    private static long mutation(WebDriver driver) {
+        try {
+            Object value = ((JavascriptExecutor) driver).executeScript("return window.__bpMut || 0");
+            return value instanceof Number number ? number.longValue() : 0L;
+        } catch (RuntimeException ex) {
+            return 0L;
+        }
+    }
+
+    private static boolean checked(WebDriver driver, WebElement element) {
+        try {
+            if (element.isSelected()) {
+                return true;
+            }
+        } catch (RuntimeException ex) {
+            return false;
+        }
+        try {
+            Object value = ((JavascriptExecutor) driver).executeScript(
+                    "const el = arguments[0]; if (!el) return false; return !!(el.checked || el.getAttribute('aria-checked') === 'true');",
+                    element);
+            return Boolean.TRUE.equals(value);
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     private static int number(Object value) {

@@ -15,7 +15,7 @@ public final class StepTargets {
 
     public static WebElement require(GraphNode node, ExecutionContext context, ElementFinder finder) {
         WebElement element = context.elementInput();
-        if (usable(element)) {
+        if (context.elementInputCurrent() && usable(element)) {
             return element;
         }
         ElementRef ref = context.elementRef();
@@ -54,11 +54,25 @@ public final class StepTargets {
             throw new IllegalArgumentException(emptyMessage);
         }
         int timeout = Math.max(2, node.integer("timeoutSeconds", 10));
-        int each = Math.max(2, timeout / candidates.size());
+        try {
+            return pass(candidates, timeout, context, finder, emptyMessage);
+        } catch (RuntimeException ex) {
+            if (ex instanceof IllegalArgumentException || finder.documentComplete(context.driver())) {
+                throw ex;
+            }
+            Pointer.settle(context.driver());
+            return pass(candidates, timeout, context, finder, emptyMessage);
+        }
+    }
+
+    private static WebElement pass(List<String[]> candidates, int timeout, ExecutionContext context, ElementFinder finder, String emptyMessage) {
+        int[] budgets = SelectorBudget.allocate(candidates.size(), timeout);
         RuntimeException last = null;
-        for (String[] candidate : candidates) {
+        for (int index = 0; index < candidates.size(); index++) {
+            String[] candidate = candidates.get(index);
+            int slice = index < budgets.length ? budgets[index] : SelectorBudget.PROBE_SECONDS;
             try {
-                return finder.find(context.driver(), candidate[0], candidate[1], each);
+                return finder.findOnce(context.driver(), candidate[0], candidate[1], Math.max(1, slice));
             } catch (RuntimeException ex) {
                 last = ex;
             }

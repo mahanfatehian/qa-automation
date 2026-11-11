@@ -56,6 +56,7 @@ public class NavigateNodeHandler implements NodeHandler {
         if (current == null || current.isBlank() || current.startsWith("data:") || current.startsWith("about:")) {
             throw new IllegalStateException("Open page did not land. The browser is still on a blank page.");
         }
+        context.invalidateElements();
         NodeOutput output = NodeOutput.pass(current);
         output.pins.put("text_out", current);
         return output;

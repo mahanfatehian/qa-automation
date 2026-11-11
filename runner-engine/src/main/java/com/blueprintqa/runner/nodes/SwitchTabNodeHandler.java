@@ -1,6 +1,7 @@
 package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
 import org.openqa.selenium.WebDriver;
@@ -25,7 +26,7 @@ public class SwitchTabNodeHandler implements NodeHandler {
             for (String handle : handles) {
                 driver.switchTo().window(handle);
                 if (driver.getCurrentUrl().contains(fragment)) {
-                    return NodeOutput.pass(driver.getCurrentUrl());
+                    return switched(context);
                 }
             }
             throw new IllegalStateException("No tab URL contains " + fragment);
@@ -35,6 +36,12 @@ public class SwitchTabNodeHandler implements NodeHandler {
             throw new IllegalArgumentException("Tab index " + index + " is out of range");
         }
         driver.switchTo().window(handles.get(index));
-        return NodeOutput.pass(driver.getCurrentUrl());
+        return switched(context);
+    }
+
+    private NodeOutput switched(ExecutionContext context) {
+        Pointer.settle(context.driver());
+        context.invalidateElements();
+        return NodeOutput.pass(context.driver().getCurrentUrl());
     }
 }

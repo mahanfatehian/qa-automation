@@ -4,9 +4,16 @@ import org.openqa.selenium.Cookie;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WindowType;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class BrowserCheckpoint {
     private static final String CAPTURE = """
@@ -46,10 +53,8 @@ public final class BrowserCheckpoint {
             const state = JSON.parse(arguments[0] || '{}');
             const load = (store, data) => {
               if (!data) return;
-              try {
-                store.clear();
-                Object.entries(data).forEach(([key, value]) => store.setItem(key, value == null ? '' : String(value)));
-              } catch (e) {}
+              store.clear();
+              Object.entries(data).forEach(([key, value]) => store.setItem(key, value == null ? '' : String(value)));
             };
             load(window.localStorage, state.local);
             load(window.sessionStorage, state.session);
@@ -79,37 +84,62 @@ public final class BrowserCheckpoint {
     public final int height;
     public final List<Cookie> cookies;
     public final String stateJson;
+    public final List<String> tabUrls;
+    public final int currentTab;
 
-    private BrowserCheckpoint(String url, int width, int height, List<Cookie> cookies, String stateJson) {
+    private BrowserCheckpoint(String url, int width, int height, List<Cookie> cookies, String stateJson, List<String> tabUrls, int currentTab) {
         this.url = url == null ? "" : url;
         this.width = width;
         this.height = height;
-        this.cookies = cookies;
+        this.cookies = List.copyOf(cookies == null ? List.of() : cookies);
         this.stateJson = stateJson == null || stateJson.isBlank() ? "{}" : stateJson;
+        this.tabUrls = List.copyOf(tabUrls == null || tabUrls.isEmpty() ? List.of(this.url) : tabUrls);
+        this.currentTab = Math.max(0, Math.min(currentTab, Math.max(0, this.tabUrls.size() - 1)));
     }
 
     public static BrowserCheckpoint capture(WebDriver driver) {
-        String url = "";
+        String origin;
         try {
-            url = driver.getCurrentUrl();
-        } catch (Exception ignored) {
-            url = "";
+            origin = driver.getWindowHandle();
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException("Cannot capture a browser checkpoint", ex);
         }
+        List<String> handles = new ArrayList<>(driver.getWindowHandles());
+        List<String> tabUrls = new ArrayList<>();
+        int current = 0;
+        Map<String, Cookie> cookies = new LinkedHashMap<>();
+        try {
+            for (int index = 0; index < handles.size(); index++) {
+                driver.switchTo().window(handles.get(index));
+                tabUrls.add(readUrl(driver));
+                if (handles.get(index).equals(origin)) {
+                    current = index;
+                }
+                try {
+                    for (Cookie cookie : driver.manage().getCookies()) {
+                        cookies.put(cookie.getName() + "|" + cookie.getDomain() + "|" + cookie.getPath(), cookie);
+                    }
+                } catch (RuntimeException ignored) {
+                    // this tab had no readable cookie jar; other tabs still count
+                }
+            }
+        } finally {
+            try {
+                driver.switchTo().window(origin);
+            } catch (RuntimeException ignored) {
+                // the caller still has the original handle if the session survived
+            }
+        }
+        String url = current < tabUrls.size() ? tabUrls.get(current) : readUrl(driver);
         int width = 1280;
         int height = 800;
         try {
             Dimension size = driver.manage().window().getSize();
             width = Math.max(320, size.width);
             height = Math.max(240, size.height);
-        } catch (Exception ignored) {
+        } catch (RuntimeException ignored) {
             width = 1280;
             height = 800;
-        }
-        List<Cookie> cookies = new ArrayList<>();
-        try {
-            cookies.addAll(driver.manage().getCookies());
-        } catch (Exception ignored) {
-            cookies.clear();
         }
         String state = "{}";
         try {
@@ -117,36 +147,145 @@ public final class BrowserCheckpoint {
             if (raw != null) {
                 state = String.valueOf(raw);
             }
-        } catch (Exception ignored) {
+        } catch (RuntimeException ignored) {
             state = "{}";
         }
-        return new BrowserCheckpoint(url, width, height, cookies, state);
+        return new BrowserCheckpoint(url, width, height, new ArrayList<>(cookies.values()), state, tabUrls, current);
     }
 
     public void restore(WebDriver driver) {
-        if (url.isBlank() || url.startsWith("data:") || url.startsWith("about:")) {
-            return;
+        if (blank(url)) {
+            throw new IllegalStateException("Clone did not land. The checkpoint page is blank, so this branch will not continue from about:blank.");
         }
+        String origin = driver.getWindowHandle();
+        openPage(driver, url);
+        applyCookies(driver, url);
         driver.navigate().to(url);
-        for (Cookie cookie : cookies) {
-            try {
-                driver.manage().addCookie(cookie);
-            } catch (Exception ignored) {
-                // domain or expiry rejected this cookie; the page still reloads from the URL
-            }
-        }
-        driver.navigate().to(url);
+        waitReady(driver);
         try {
             ((JavascriptExecutor) driver).executeScript(RESTORE_STORAGE, stateJson);
-            driver.navigate().refresh();
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException("Could not restore page storage for " + url, ex);
+        }
+        driver.navigate().refresh();
+        waitReady(driver);
+        try {
             ((JavascriptExecutor) driver).executeScript(RESTORE_FIELDS, stateJson);
-        } catch (Exception ignored) {
-            // storage can be blocked; the URL and cookies are the clone
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException("Could not restore form fields for " + url, ex);
         }
         try {
             driver.manage().window().setSize(new Dimension(width, height));
-        } catch (Exception ignored) {
+        } catch (RuntimeException ignored) {
             // grid may ignore window size
         }
+        for (int index = 0; index < tabUrls.size(); index++) {
+            if (index == currentTab) {
+                continue;
+            }
+            String tabUrl = tabUrls.get(index);
+            driver.switchTo().newWindow(WindowType.TAB);
+            if (blank(tabUrl)) {
+                continue;
+            }
+            openPage(driver, tabUrl);
+            applyCookies(driver, tabUrl);
+            driver.navigate().to(tabUrl);
+            waitReady(driver);
+        }
+        driver.switchTo().window(origin);
+        waitReady(driver);
+        String landed = readUrl(driver);
+        if (!pageLanded(url, landed)) {
+            String where = blank(landed) ? "a blank page" : landed;
+            throw new IllegalStateException("Clone did not land on " + url + ". The browser is on " + where + ".");
+        }
+    }
+
+    public static boolean pageLanded(String expected, String actual) {
+        if (blank(expected) || blank(actual)) {
+            return false;
+        }
+        return canonical(expected).equals(canonical(actual));
+    }
+
+    private void openPage(WebDriver driver, String pageUrl) {
+        driver.navigate().to(pageUrl);
+        waitReady(driver);
+        String landed = readUrl(driver);
+        if (blank(landed)) {
+            throw new IllegalStateException("Clone did not land. The browser is still on a blank page.");
+        }
+    }
+
+    private void applyCookies(WebDriver driver, String pageUrl) {
+        for (Cookie cookie : cookies) {
+            if (cookie == null || expired(cookie) || !applies(cookie, pageUrl)) {
+                continue;
+            }
+            try {
+                driver.manage().addCookie(cookie);
+            } catch (RuntimeException ex) {
+                throw new IllegalStateException("Could not restore cookie " + cookie.getName() + " for " + pageUrl, ex);
+            }
+        }
+    }
+
+    private void waitReady(WebDriver driver) {
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(20)).until(webDriver ->
+                    "complete".equals(((JavascriptExecutor) webDriver).executeScript("return document.readyState"))
+            );
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException("Clone page did not become ready", ex);
+        }
+    }
+
+    private static boolean applies(Cookie cookie, String pageUrl) {
+        String domain = cookie.getDomain();
+        if (domain == null || domain.isBlank()) {
+            return true;
+        }
+        String host = host(pageUrl);
+        if (host.isBlank()) {
+            return false;
+        }
+        String normalized = domain.startsWith(".") ? domain.substring(1) : domain;
+        return host.equalsIgnoreCase(normalized) || host.toLowerCase().endsWith("." + normalized.toLowerCase());
+    }
+
+    private static boolean expired(Cookie cookie) {
+        Date expiry = cookie.getExpiry();
+        return expiry != null && expiry.before(new Date());
+    }
+
+    private static String host(String pageUrl) {
+        try {
+            String host = URI.create(pageUrl).getHost();
+            return host == null ? "" : host;
+        } catch (RuntimeException ex) {
+            return "";
+        }
+    }
+
+    private static String readUrl(WebDriver driver) {
+        try {
+            String current = driver.getCurrentUrl();
+            return current == null ? "" : current;
+        } catch (RuntimeException ex) {
+            return "";
+        }
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank() || value.startsWith("about:") || value.startsWith("data:");
+    }
+
+    private static String canonical(String value) {
+        String text = value.trim();
+        if (text.length() > "http://x/".length() && text.endsWith("/")) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text;
     }
 }

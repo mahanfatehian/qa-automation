@@ -37,6 +37,8 @@ public class TypeTextNodeHandler implements NodeHandler {
         Pointer.type(context.driver(), element, text, node.bool("clearFirst", true));
         if (node.bool("pressEnter", false)) {
             element.sendKeys(Keys.ENTER);
+            Pointer.settle(context.driver());
+            context.invalidateElements();
         }
         NodeOutput output = NodeOutput.pass("Typed");
         output.pins.put("text_out", text);

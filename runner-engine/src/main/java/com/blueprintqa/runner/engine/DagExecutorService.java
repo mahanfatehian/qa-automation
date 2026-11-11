@@ -263,23 +263,28 @@ public class DagExecutorService {
     private void fork(List<GraphNode> next, WorkflowJob job, ExecutionContext context, AtomicInteger steps) {
         BrowserCheckpoint checkpoint = BrowserCheckpoint.capture(context.driver());
         ExecutionContext origin = context.fork(context.driver(), context.branch());
-        List<Integer> serial = new ArrayList<>();
+        int copiedSteps = steps.get();
         List<Thread> parallel = new ArrayList<>();
         List<Throwable> failures = new ArrayList<>();
-        for (int index = 1; index < next.size(); index++) {
-            if (!budget.tryAcquire(2)) {
-                serial.add(index);
+        for (BranchPlan.Entry entry : BranchPlan.of(next.size())) {
+            if (!entry.opensNewSession()) {
+                if (entry.index() != 0 || entry.sharesDriver()) {
+                    throw new IllegalStateException("Only the first execution pin keeps the live session");
+                }
                 continue;
             }
-            int branch = index + 1;
-            GraphNode target = next.get(index);
+            int branch = entry.index() + 1;
+            GraphNode target = next.get(entry.index());
             Thread thread = Thread.ofVirtual().name("branch-" + job.runId + "-" + branch).start(() -> {
                 WebDriver clone = null;
+                boolean held = false;
                 try {
+                    budget.acquire();
+                    held = true;
                     clone = selenium.open(job.start(), sessionName(job, branch), 4);
                     sessions.add(clone);
                     checkpoint.restore(clone);
-                    runNode(target, job, origin.fork(clone, branchName(context, branch)), steps);
+                    runNode(target, job, origin.fork(clone, branchName(context, branch)), new AtomicInteger(copiedSteps));
                 } catch (Exception ex) {
                     synchronized (failures) {
                         failures.add(ex);
@@ -293,31 +298,28 @@ public class DagExecutorService {
                             log.debug("branch browser already closed");
                         }
                     }
-                    budget.release();
+                    if (held) {
+                        budget.release();
+                    }
                 }
             });
             parallel.add(thread);
         }
         try {
-            runNode(next.get(0), job, origin.fork(context.driver(), branchName(context, 1)), steps);
+            runNode(next.get(0), job, origin.fork(context.driver(), branchName(context, 1)), new AtomicInteger(copiedSteps));
         } catch (Exception ex) {
-            failures.add(ex);
+            synchronized (failures) {
+                failures.add(ex);
+            }
         }
         for (Thread thread : parallel) {
             try {
                 thread.join();
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
-                failures.add(ex);
-            }
-        }
-        for (int index : serial) {
-            int branch = index + 1;
-            try {
-                checkpoint.restore(context.driver());
-                runNode(next.get(index), job, origin.fork(context.driver(), branchName(context, branch)), steps);
-            } catch (Exception ex) {
-                failures.add(ex);
+                synchronized (failures) {
+                    failures.add(ex);
+                }
             }
         }
         if (!failures.isEmpty()) {

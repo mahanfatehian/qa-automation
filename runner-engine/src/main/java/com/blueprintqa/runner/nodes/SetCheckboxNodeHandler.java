@@ -26,7 +26,7 @@ public class SetCheckboxNodeHandler implements NodeHandler {
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
         WebElement element = StepTargets.require(node, context, finder);
         boolean want = node.bool("checked", true);
-        boolean landed = Pointer.check(context.driver(), element, want);
+        boolean landed = Pointer.check(context.driver(), element, want, context);
         NodeOutput output = NodeOutput.pass(want ? "Checked" : "Unchecked");
         output.pins.put("bool_out", landed);
         return output;

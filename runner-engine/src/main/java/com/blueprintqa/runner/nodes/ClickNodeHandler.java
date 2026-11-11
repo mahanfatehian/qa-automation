@@ -25,10 +25,6 @@ public class ClickNodeHandler implements NodeHandler {
     @Override
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
         WebElement element = StepTargets.require(node, context, finder);
-        if (node.bool("forceJsClick", false)) {
-            ((org.openqa.selenium.JavascriptExecutor) context.driver()).executeScript("arguments[0].click();", element);
-            return NodeOutput.pass("Clicked");
-        }
-        return NodeOutput.pass(Pointer.click(context.driver(), element));
+        return NodeOutput.pass(Pointer.click(context.driver(), element, context));
     }
 }

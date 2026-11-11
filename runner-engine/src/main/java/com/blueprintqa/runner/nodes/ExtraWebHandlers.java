@@ -25,6 +25,8 @@ class OpenTabNodeHandler implements NodeHandler {
         ((JavascriptExecutor) context.driver()).executeScript("window.open(arguments[0], '_blank');", url);
         ArrayList<String> handles = new ArrayList<>(context.driver().getWindowHandles());
         context.driver().switchTo().window(handles.get(handles.size() - 1));
+        Pointer.settle(context.driver());
+        context.invalidateElements();
         NodeOutput output = NodeOutput.pass(context.driver().getCurrentUrl());
         output.pins.put("text_out", output.message);
         return output;
@@ -43,6 +45,8 @@ class CloseTabNodeHandler implements NodeHandler {
         driver.close();
         handles.remove(current);
         driver.switchTo().window(handles.get(handles.size() - 1));
+        Pointer.settle(driver);
+        context.invalidateElements();
         NodeOutput output = NodeOutput.pass(driver.getCurrentUrl());
         output.pins.put("text_out", output.message);
         return output;
@@ -188,10 +192,11 @@ class SubmitNodeHandler implements NodeHandler {
         var element = StepTargets.require(node, context, finder);
         String before = context.driver().getCurrentUrl();
         element.submit();
-        Pointer.ready(context.driver());
+        Pointer.settle(context.driver());
         if (before.equals(context.driver().getCurrentUrl())) {
             throw new IllegalStateException("Submit did not land. The page did not leave this URL.");
         }
+        context.invalidateElements();
         return NodeOutput.pass("Submitted");
     }
 }
