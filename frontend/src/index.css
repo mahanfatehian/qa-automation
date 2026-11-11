@@ -14,7 +14,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: #262626;
   box-shadow: none;
 }
-.bp-node.is-selected { outline: 1px solid #7f6df2; outline-offset: 2px; }
+.bp-node.is-selected,
+.bp-node.status-running.is-selected,
+.bp-node.status-passed.is-selected,
+.bp-node.status-failed.is-selected {
+  box-shadow: 0 0 0 2px #1e1e1e, 0 0 0 4px #7f6df2;
+}
 .bp-node.status-running { outline: 1px solid #7f6df2; }
 .bp-node.status-passed { outline: 1px solid #7d9a6a; }
 .bp-node.status-failed { outline: 1px solid #d46a6a; }
