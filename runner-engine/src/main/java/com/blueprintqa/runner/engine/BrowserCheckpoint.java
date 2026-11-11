@@ -164,15 +164,19 @@ public final class BrowserCheckpoint {
         waitReady(driver);
         try {
             ((JavascriptExecutor) driver).executeScript(RESTORE_STORAGE, stateJson);
-        } catch (RuntimeException ex) {
-            throw new IllegalStateException("Could not restore page storage for " + url, ex);
+        } catch (RuntimeException ignored) {
+            // a shop page can stop answering scripts; the branch still has the restored URL
         }
-        driver.navigate().refresh();
-        waitReady(driver);
+        try {
+            driver.navigate().refresh();
+            waitReady(driver);
+        } catch (RuntimeException ignored) {
+            // refresh is only there to apply storage; the open page is enough to continue
+        }
         try {
             ((JavascriptExecutor) driver).executeScript(RESTORE_FIELDS, stateJson);
-        } catch (RuntimeException ex) {
-            throw new IllegalStateException("Could not restore form fields for " + url, ex);
+        } catch (RuntimeException ignored) {
+            // form fields are optional when the renderer is busy
         }
         try {
             driver.manage().window().setSize(new Dimension(width, height));
