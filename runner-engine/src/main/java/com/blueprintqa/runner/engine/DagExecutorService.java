@@ -133,6 +133,7 @@ public class DagExecutorService {
             throw new IllegalStateException("Stopped: this blueprint hit the " + guard + " step guard");
         }
         resolveInputs(node, job, context);
+        borrowSelector(node, job);
         long started = System.nanoTime();
         telemetry.publish(job, "NODE_RUNNING", node.id, node.semanticType(), 0, "", "", Map.of(), "");
         NodeOutput output;
@@ -198,6 +199,41 @@ public class DagExecutorService {
             Object value = context.getPin(edge.source, edge.sourceHandleOrDefault());
             context.putInput(target, value);
         }
+    }
+
+    private void borrowSelector(GraphNode node, WorkflowJob job) {
+        if (node == null || node.data == null || !"SEARCH_ELEMENT".equals(node.semanticType()) || hasSelector(node)) {
+            return;
+        }
+        for (GraphNode next : successors(job, node.id, "exec_out")) {
+            if (!hasSelector(next)) {
+                continue;
+            }
+            if (next.data.get("selectors") != null) {
+                node.data.put("selectors", next.data.get("selectors"));
+            }
+            String strategy = next.str("strategy", "");
+            String query = next.str("query", next.str("xpath", ""));
+            if (!strategy.isBlank()) {
+                node.data.put("strategy", strategy);
+            }
+            if (!query.isBlank()) {
+                node.data.put("query", query);
+                node.data.put("xpath", query);
+            }
+            return;
+        }
+    }
+
+    private boolean hasSelector(GraphNode node) {
+        if (node == null || node.data == null) {
+            return false;
+        }
+        Object raw = node.data.get("selectors");
+        if (raw instanceof java.util.List<?> list && !list.isEmpty()) {
+            return true;
+        }
+        return !node.str("query", "").isBlank() || !node.str("xpath", "").isBlank();
     }
 
     private void store(GraphNode node, NodeOutput output, ExecutionContext context) {

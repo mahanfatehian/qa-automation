@@ -12,10 +12,10 @@ const clauseLabel: Record<string, string> = {
 };
 
 const pinColor: Record<PinKind, string> = {
-  exec: "#f4f7fb",
-  element: "#3ddc97",
-  text: "#49c2ff",
-  bool: "#ffb020",
+  exec: "#f4efe6",
+  element: "#c9d7b0",
+  text: "#8eb8c9",
+  bool: "#e0b15a",
 };
 
 export function BlueprintNode({ data, selected }: NodeProps<FlowNode>) {

@@ -1,3 +1,4 @@
+import { CATALOG_BY_TYPE } from "../catalog";
 import type { TelemetryEvent, TestRun } from "../types/blueprint";
 
 type Props = {
@@ -5,48 +6,84 @@ type Props = {
   events: TelemetryEvent[];
   shot: string;
   runs: TestRun[];
+  height: number;
   onPick: (event: TelemetryEvent) => void;
   onOpenRun: (run: TestRun) => void;
 };
 
-export function LiveRunOverlay({ run, events, shot, runs, onPick, onOpenRun }: Props) {
-  const steps = events.filter((event) => event.event_type?.startsWith("NODE_"));
+export function LiveRunOverlay({ run, events, shot, runs, height, onPick, onOpenRun }: Props) {
+  const steps = latestSteps(events);
+  const failed = steps.find((event) => event.event_type.endsWith("FAILED"));
+  const summary = failed ? plain(failed.message || run?.error_message || "") : "";
   return (
-    <section className="panel grid h-52 shrink-0 grid-cols-[280px_1fr_280px] border-t border-line">
+    <section className="panel grid shrink-0 grid-cols-[190px_minmax(0,1fr)_minmax(280px,40%)] border-t border-line" style={{ height }} data-testid="live-well">
       <div className="overflow-auto border-r border-line p-3">
-        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6bb]" data-testid="run-status">
-          Run {run ? run.status : "idle"} {run ? `· ${run.trigger}` : ""}
+        <p className="mark text-[#8f857a]" data-testid="run-status">
+          {run ? `${word(run.status)} · ${run.trigger.toLowerCase()}` : "Idle"}
         </p>
-        <div className="mb-2 flex flex-wrap gap-1">
-          {runs.slice(0, 6).map((item) => (
-            <button key={item.id} className="btn px-1 py-0 text-[10px]" onClick={() => onOpenRun(item)}>{item.status}</button>
-          ))}
-        </div>
-        {steps.length === 0 && <p className="text-sm text-[#8ea6bb]">Step feedback shows up here: status, duration, text, and the screenshot taken at that pin.</p>}
-        {steps.map((event, index) => (
-          <button key={`${event.node_id}-${event.event_type}-${index}`} className="mb-1 block w-full rounded px-2 py-1 text-left text-xs hover:bg-[#122033]" onClick={() => onPick(event)}>
-            <span className={tone(event.event_type)}>{event.event_type.replace("NODE_", "")}</span>
-            <span className="ml-2 text-[#d5e4f0]">{event.node_type}</span>
-            <span className="ml-2 text-[#8ea6bb]">{event.duration_ms ? `${event.duration_ms}ms` : ""}</span>
-            {event.message && <span className="mt-0.5 block truncate text-[#8ea6bb]">{event.message}</span>}
+        {summary && <p className="mt-2 text-sm leading-5 text-[#f4efe6]">{summary}</p>}
+        <p className="mark mb-2 mt-4 text-[#8f857a]">Earlier runs</p>
+        {runs.slice(0, 8).map((item) => (
+          <button key={item.id} className="mb-1 flex w-full items-baseline justify-between gap-2 text-left text-xs" data-testid="past-run" onClick={() => onOpenRun(item)}>
+            <span className="text-[#cbbba8]">{clock(item.created_at)}</span>
+            <span className={item.status === "PASSED" ? "text-[#c9d7b0]" : item.status === "FAILED" ? "text-[#e7a090]" : "text-[#e0b15a]"}>{word(item.status)}</span>
           </button>
         ))}
       </div>
-      <div className="grid place-items-center bg-[#070d14]">
-        {shot ? <img alt="Step screenshot" className="max-h-48 max-w-full object-contain" src={`data:image/png;base64,${shot}`} /> : <p className="text-sm text-[#8ea6bb]">No screenshot yet</p>}
+      <div className="overflow-auto px-3 py-2" data-testid="run-steps">
+        {steps.length === 0 && <p className="pt-3 text-sm text-[#8f857a]">Each step lands here once: what it was, how long it took, and what it said.</p>}
+        {steps.map((event) => (
+          <button key={event.node_id} className="step-row" data-testid="run-step" onClick={() => onPick(event)}>
+            <span className={tone(event.event_type)}>{word(event.event_type.replace("NODE_", ""))}</span>
+            <span>{(event.node_type && CATALOG_BY_TYPE[event.node_type]?.title) || event.node_type || "Step"}</span>
+            <span className="text-[#8f857a]">{event.duration_ms ? `${event.duration_ms}ms` : ""}</span>
+            <span className="truncate text-[#cbbba8]">{plain(event.message)}</span>
+          </button>
+        ))}
       </div>
-      <div className="overflow-auto border-l border-line p-3 text-xs text-[#d5e4f0]">
-        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6bb]">Output</p>
-        <pre className="whitespace-pre-wrap font-mono text-[11px] text-[#9ad8ff]">{JSON.stringify(steps.at(-1)?.output_data || {}, null, 2)}</pre>
-        {run?.error_message && <p className="mt-2 text-[#ff8fa3]">{run.error_message}</p>}
-        {steps.at(-1)?.error_stack && <p className="mt-2 whitespace-pre-wrap text-[#ffb3c1]">{steps.at(-1)?.error_stack}</p>}
+      <div className="grid min-h-0 place-items-center border-l border-line bg-[#16130f] p-2">
+        {shot ? <img alt="Step screenshot" className="max-h-full max-w-full object-contain" src={`data:image/png;base64,${shot}`} /> : <p className="text-sm text-[#8f857a]">The live page shows here. Drag the brass bar to make this taller.</p>}
       </div>
     </section>
   );
 }
 
+function latestSteps(events: TelemetryEvent[]) {
+  const rank = (kind: string) => kind.endsWith("FAILED") ? 3 : kind.endsWith("PASSED") ? 2 : 1;
+  const byNode = new Map<string, TelemetryEvent>();
+  for (const event of events) {
+    if (!event.event_type?.startsWith("NODE_") || !event.node_id) continue;
+    const prev = byNode.get(event.node_id);
+    if (!prev || rank(event.event_type) >= rank(prev.event_type)) byNode.set(event.node_id, event);
+  }
+  return [...byNode.values()];
+}
+
+function plain(message?: string | null) {
+  if (!message) return "";
+  return message
+    .replace(/(https?:\/\/\S+\s*[—-]\s*)+/g, "")
+    .replace("This step needs a selector or search text", "No selector on this step. Use Select on page.")
+    .replace("Find needs a selector. Use Select on page, or type a CSS, XPath, or text query.", "No selector on this step. Use Select on page.")
+    .trim();
+}
+
+function word(status: string) {
+  if (status === "PASSED") return "Passed";
+  if (status === "FAILED") return "Failed";
+  if (status === "RUNNING") return "Running";
+  if (status === "QUEUED") return "Queued";
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
 function tone(eventType: string) {
-  if (eventType.endsWith("PASSED")) return "text-[#3dff9a]";
-  if (eventType.endsWith("FAILED")) return "text-[#ff4d6a]";
-  return "text-[#ffe14a]";
+  if (eventType.endsWith("PASSED")) return "text-[#c9d7b0]";
+  if (eventType.endsWith("FAILED")) return "text-[#e7a090]";
+  return "text-[#e0b15a]";
+}
+
+function clock(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

@@ -21,10 +21,10 @@ import { BlueprintNode } from "./nodes/BlueprintNode";
 const nodeTypes = Object.fromEntries(CATALOG.map((step) => [step.type, BlueprintNode]));
 
 const stroke: Record<string, string> = {
-  exec: "#f4f7fb",
-  element: "#3ddc97",
-  text: "#49c2ff",
-  bool: "#ffb020",
+  exec: "#f4efe6",
+  element: "#c9d7b0",
+  text: "#8eb8c9",
+  bool: "#e0b15a",
 };
 
 type Props = {
@@ -96,12 +96,18 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
         onSelectionChange={({ nodes: selected }) => onSelect(selected[0]?.id ?? null)}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
+        selectionOnDrag
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode={["Meta", "Control"]}
+        panOnScroll
+        selectNodesOnDrag={false}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#1e293b" />
         <Controls />
         <MiniMap pannable zoomable nodeColor={miniColor} />
       </ReactFlow>
+      <p className="canvas-hint">Shift-drag selects · Ctrl+A selects all · drag a selected step to move the group</p>
     </div>
   );
 }

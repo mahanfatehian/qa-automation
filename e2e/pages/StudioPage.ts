@@ -32,6 +32,6 @@ export class StudioPage {
 
   async runFixture() {
     await this.page.getByRole("button", { name: "Run blueprint" }).click();
-    await expect(this.runStatus).toContainText(/PASSED|FAILED|ERROR/, { timeout: 60_000 });
+    await expect(this.runStatus).toContainText(/Passed|Failed|Error/, { timeout: 60_000 });
   }
 }

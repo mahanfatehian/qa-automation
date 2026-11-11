@@ -9,7 +9,7 @@ export default {
       colors: {
         ink: "#081018",
         panel: "#0d1722",
-        line: "#1e3348",
+        line: "#3d342c",
       },
     },
   },

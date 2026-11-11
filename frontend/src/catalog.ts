@@ -284,10 +284,10 @@ export const CLAUSE: Record<string, Clause> = {
 };
 
 export const CLAUSE_COLOR: Record<Clause, string> = {
-  given: "#2fbfae",
-  when: "#49c2ff",
-  then: "#ffb020",
-  flow: "#ff5d73",
+  given: "#c9d7b0",
+  when: "#f0e2c8",
+  then: "#e0b15a",
+  flow: "#e7a090",
 };
 
 export const CATALOG_BY_TYPE = Object.fromEntries(CATALOG.map((step) => [step.type, step]));

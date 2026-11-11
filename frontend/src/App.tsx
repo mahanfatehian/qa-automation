@@ -36,6 +36,7 @@ export function App() {
   const [pickResult, setPickResult] = useState<PickResult | null>(null);
   const [pickError, setPickError] = useState("");
   const [pickNodeId, setPickNodeId] = useState<string | null>(null);
+  const [well, setWell] = useState(240);
 
   const active = workflows.find((item) => item.id === activeId) || null;
   const selected = nodes.find((node) => node.id === selectedId) || null;
@@ -170,6 +171,12 @@ export function App() {
         event.preventDefault();
         runBlueprint().catch((err: Error) => setError(err.message));
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+        event.preventDefault();
+        setNodes((current) => current.map((node) => ({ ...node, selected: true })));
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -177,11 +184,10 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#0b141e] px-3" data-testid="studio-header">
-        <div className="grid h-7 w-7 place-items-center bg-[#49c2ff] text-xs font-bold text-[#081018]" style={{ clipPath: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)" }}>B</div>
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#16130f] px-3" data-testid="studio-header">
         <div>
-          <p className="text-sm font-semibold leading-4">BlueprintQA</p>
-          <p className="font-mono text-[10px] text-[#8ea6bb]">node to node browser tests</p>
+          <p className="text-sm font-semibold leading-4 tracking-tight">Blueprint bench</p>
+          <p className="font-mono text-[10px] text-[#8f857a]">wire the steps, then run them</p>
         </div>
         <select className="btn max-w-56" value={activeId || ""} onChange={(event) => {
           const next = workflows.find((item) => item.id === event.target.value);
@@ -207,10 +213,11 @@ export function App() {
         <button className="btn btn-run" onClick={() => runBlueprint().catch((err: Error) => setError(err.message))}>Run blueprint</button>
         <button className="btn" onClick={() => setExamplesOpen(true)}>Examples{examples.length ? ` (${examples.length})` : ""}</button>
         <button className="btn" onClick={() => setScheduleOpen(true)}>Automatic runs</button>
-        <span className="ml-auto font-mono text-[11px] text-[#8ea6bb]">{grid}</span>
+        <span className="ml-auto font-mono text-[11px] text-[#8f857a]">{grid}</span>
         {run && <a className="btn" href={`/api/v1/runs/${run.id}/junit`}>JUnit</a>}
       </header>
-      {error && <p className="bg-[#3a1420] px-3 py-1 text-sm text-[#ffb3c1]">{error}</p>}
+      {error && <p className="bg-[#3a241c] px-3 py-1 text-sm text-[#e7a090]">{error}</p>}
+      <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1">
         <NodePalette />
         <BlueprintCanvas
@@ -274,7 +281,20 @@ export function App() {
           }}
         />
       </div>
-      <LiveRunOverlay run={run} events={events} shot={shot} runs={runs} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
+      <div className="well-rail" data-testid="well-rail" onPointerDown={(event) => {
+        event.preventDefault();
+        const startY = event.clientY;
+        const start = well;
+        const move = (pointer: PointerEvent) => setWell(Math.min(window.innerHeight - 180, Math.max(140, start - (pointer.clientY - startY))));
+        const up = () => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      }} />
+      <LiveRunOverlay height={well} run={run} events={events} shot={shot} runs={runs} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
+      </div>
       <ScheduleModal open={scheduleOpen} workflowId={activeId} webhookToken={active?.webhook_token || ""} onClose={() => setScheduleOpen(false)} />
       <ExamplesModal open={examplesOpen} rows={examples} onClose={() => setExamplesOpen(false)} onChange={(rows) => { setExamples(rows); setDirty(true); }} />
       <InspectModal
@@ -288,23 +308,22 @@ export function App() {
           setDirty(true);
           const picked = { strategy, query, xpath: query, selectors };
           const current = nodes.find((node) => node.id === pickNodeId);
-          if (current && current.data.nodeType === stepType) {
+          if (!current) return;
+          const holdsSelector = ["SEARCH_ELEMENT", "CLICK", "TYPE_TEXT", "EXTRACT_CONTENT", "HOVER", "SCROLL", "SELECT_OPTION", "UPLOAD", "ENTER_FRAME", "VERIFY", "SET_CHECKBOX", "DOUBLE_CLICK", "RIGHT_CLICK"].includes(String(current.data.nodeType));
+          if (current.data.nodeType === stepType) {
             setNodes((items) => items.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, ...picked } } : node));
-          } else if (current) {
+          } else {
             const id = `n_${crypto.randomUUID().slice(0, 8)}`;
-            setNodes((items) => items.concat({
+            setNodes((items) => items.map((node) => node.id === pickNodeId && holdsSelector ? { ...node, data: { ...node.data, ...picked } } : node).concat({
               id,
               type: stepType,
               position: { x: current.position.x + 280, y: current.position.y },
               data: { nodeType: stepType, ...picked },
             }));
-            setEdges((items) => items.concat({
-              id: `e_${id}`,
-              source: current.id,
-              target: id,
-              sourceHandle: "exec_out",
-              targetHandle: "exec_in",
-            }));
+            setEdges((items) => items.concat([
+              { id: `e_${id}`, source: current.id, target: id, sourceHandle: "exec_out", targetHandle: "exec_in" },
+              ...(current.data.nodeType === "SEARCH_ELEMENT" ? [{ id: `el_${id}`, source: current.id, target: id, sourceHandle: "element_out", targetHandle: "element_in" }] : []),
+            ]));
           }
           setPickOpen(false);
         }}
