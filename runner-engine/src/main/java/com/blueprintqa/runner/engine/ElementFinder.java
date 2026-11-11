@@ -36,20 +36,27 @@ public class ElementFinder {
 
     private static final String TEXT_SCRIPT = """
             const needle = String(arguments[0] || '').toLowerCase();
-            const state = { el: null, len: Infinity };
-            const visit = (root) => {
-              if (!root || !root.querySelectorAll) return;
-              for (const el of root.querySelectorAll('*')) {
-                const text = (el.innerText || el.textContent || '').trim().toLowerCase();
-                if (text && text.includes(needle) && text.length < state.len) {
-                  state.el = el;
-                  state.len = text.length;
-                }
-                if (el.shadowRoot) visit(el.shadowRoot);
+            const scan = (root) => {
+              if (!root || !root.querySelectorAll) return null;
+              let best = null;
+              let bestLen = Infinity;
+              const nodes = root.querySelectorAll('a,button,label,h1,h2,h3,h4,p,li,td,th,span,option');
+              for (const el of nodes) {
+                const text = (el.textContent || '').trim().toLowerCase();
+                if (!text || text.length > 180 || !text.includes(needle) || text.length >= bestLen) continue;
+                best = el;
+                bestLen = text.length;
               }
+              return best;
             };
-            visit(document);
-            return state.el;
+            return scan(document) || scan(document.body) || (() => {
+              for (const host of document.querySelectorAll('*')) {
+                if (!host.shadowRoot) continue;
+                const found = scan(host.shadowRoot);
+                if (found) return found;
+              }
+              return null;
+            })();
             """;
 
     private static final String REGEX_SCRIPT = """
@@ -71,6 +78,36 @@ public class ElementFinder {
             visit(document);
             return state.el;
             """;
+
+    public WebElement hit(WebDriver driver, String strategy, String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
+        try {
+            if ("CSS".equals(kind) || "TEXT_CONTAINS".equals(kind) || "REGEX_DOM".equals(kind)) {
+                String script = switch (kind) {
+                    case "TEXT_CONTAINS" -> TEXT_SCRIPT;
+                    case "REGEX_DOM" -> REGEX_SCRIPT;
+                    default -> CSS_SCRIPT;
+                };
+                Object found = ((JavascriptExecutor) driver).executeScript(script, query);
+                return found instanceof WebElement element && interactable(element) ? element : null;
+            }
+            By by = by(kind, query);
+            if (by == null) {
+                return null;
+            }
+            for (WebElement element : driver.findElements(by)) {
+                if (interactable(element)) {
+                    return element;
+                }
+            }
+            return null;
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
 
     public WebElement find(WebDriver driver, String strategy, String query, int timeoutSeconds) {
         try {

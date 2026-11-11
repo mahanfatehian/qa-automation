@@ -1,7 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-docker compose up --build -d --scale chrome-node=2
+set COUNT=2
+if exist runtime\browsers.txt set /p COUNT=<runtime\browsers.txt
+docker compose up --build -d --scale chrome-node=%COUNT%
 if errorlevel 1 exit /b 1
 echo.
 echo BlueprintQA is starting.

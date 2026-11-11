@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.grid_scale import scale
 from app.redis_bus import get_redis
 
 router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
@@ -29,7 +30,8 @@ async def read_settings() -> dict:
 async def write_settings(body: StudioSettings) -> dict:
     payload = body.model_dump()
     await get_redis().set(KEY, json.dumps(payload))
-    return {**payload, "grid": await _grid()}
+    note = scale(body.browser_slots)
+    return {**payload, "grid": await _grid(), "scale_note": note}
 
 
 async def _stored() -> dict:

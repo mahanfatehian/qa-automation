@@ -1,7 +1,7 @@
 .PHONY: up down logs scale clean ps
 
 up:
-	docker compose up --build -d --scale chrome-node=2
+	docker compose up --build -d --scale chrome-node=$$(if [ -f runtime/browsers.txt ]; then cat runtime/browsers.txt; else echo 2; fi)
 
 down:
 	docker compose down

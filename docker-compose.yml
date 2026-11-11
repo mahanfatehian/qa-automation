@@ -93,6 +93,10 @@ services:
       context: ./control-plane
     ports:
       - "${CONTROL_PLANE_PORT:-8000}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/workspace/docker-compose.yml:ro
+      - ./runtime:/runtime
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://blueprint:blueprint@postgres:5432/blueprintqa}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -100,6 +104,9 @@ services:
       SELENIUM_GRID_URL: ${SELENIUM_GRID_URL:-http://selenium-hub:4444}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       MAX_STEPS: ${MAX_STEPS:-500}
+      COMPOSE_FILE: /workspace/docker-compose.yml
+      COMPOSE_PROJECT_NAME: blueprintqa
+      BROWSER_COUNT_FILE: /runtime/browsers.txt
     depends_on:
       postgres:
         condition: service_healthy

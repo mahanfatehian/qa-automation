@@ -192,14 +192,28 @@ public final class Pointer {
         } catch (Exception ignored) {
             // interactive is enough if the site never reaches complete
         }
-        int wait = Math.min(5000, Math.max(0, GridBudget.readyMs));
-        if (wait == 0) {
+        int cap = Math.min(5000, Math.max(0, GridBudget.readyMs));
+        if (cap == 0) {
             return;
         }
-        try {
-            Thread.sleep(wait);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
+        long start = System.currentTimeMillis();
+        long quietSince = start;
+        long last = mutation(driver);
+        while (System.currentTimeMillis() - start < cap) {
+            long nowMut = mutation(driver);
+            long now = System.currentTimeMillis();
+            if (nowMut != last) {
+                last = nowMut;
+                quietSince = now;
+            } else if (now - quietSince >= 120L) {
+                return;
+            }
+            try {
+                Thread.sleep(40L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 

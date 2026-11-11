@@ -22,12 +22,11 @@ public final class SelectorBudget {
         if (probe * others > maxProbeSpend) {
             probe = Math.max(0, maxProbeSpend / others);
         }
-        int spent = 0;
-        for (int index = 0; index < others; index++) {
+        int spent = probe * others;
+        slices[0] = Math.max(1, timeout - spent);
+        for (int index = 1; index < candidates; index++) {
             slices[index] = probe;
-            spent += probe;
         }
-        slices[candidates - 1] = Math.max(1, timeout - spent);
         return slices;
     }
 
@@ -36,6 +35,6 @@ public final class SelectorBudget {
         if (slices.length == 0) {
             return Math.max(0, timeoutSeconds);
         }
-        return slices[slices.length - 1];
+        return slices[0];
     }
 }

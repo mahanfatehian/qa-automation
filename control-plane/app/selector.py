@@ -192,7 +192,28 @@ def _from_fingerprint(fingerprint: dict) -> list[dict]:
         element_id = str(source.get("id") or "")
         if _stable_id(element_id):
             add("ID", element_id, 6)
+    path_css = _path_css(path if isinstance(path, list) else [])
+    if path_css:
+        add("CSS", path_css, 8)
     return ranked
+
+
+def _path_css(path: list) -> str:
+    parts: list[str] = []
+    for part in path:
+        if not isinstance(part, dict):
+            continue
+        tag = str(part.get("tag") or "").lower()
+        if not tag or tag in {"html", "#document"}:
+            continue
+        try:
+            nth = max(1, int(part.get("nth") or 1))
+        except (TypeError, ValueError):
+            nth = 1
+        parts.append(f"{tag}:nth-of-type({nth})")
+    if len(parts) < 2:
+        return ""
+    return " > ".join(parts[-8:])
 
 
 def _stable_id(value: str) -> bool:

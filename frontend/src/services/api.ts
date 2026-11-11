@@ -25,9 +25,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   status: () => request<{ database: boolean; redis: boolean; grid: { ready: boolean; node_count: number; message: string } }>("/api/v1/system/status"),
-  settings: () => request<{ browser_slots: number; ready_ms: number; window_width: number; window_height: number; grid?: { ready: boolean; nodes: number; slots: number } }>("/api/v1/settings"),
+  settings: () => request<{ browser_slots: number; ready_ms: number; window_width: number; window_height: number; scale_note?: string; grid?: { ready: boolean; nodes: number; slots: number } }>("/api/v1/settings"),
   saveSettings: (body: { browser_slots: number; ready_ms: number; window_width: number; window_height: number }) =>
-    request<{ browser_slots: number; ready_ms: number; window_width: number; window_height: number; grid?: { ready: boolean; nodes: number; slots: number } }>("/api/v1/settings", { method: "PUT", body: JSON.stringify(body) }),
+    request<{ browser_slots: number; ready_ms: number; window_width: number; window_height: number; scale_note?: string; grid?: { ready: boolean; nodes: number; slots: number } }>("/api/v1/settings", { method: "PUT", body: JSON.stringify(body) }),
   workflows: () => request<Workflow[]>("/api/v1/workflows"),
   createWorkflow: (body: { name: string; description?: string; graph?: Workflow["graph"] }) =>
     request<Workflow>("/api/v1/workflows", { method: "POST", body: JSON.stringify(body) }),

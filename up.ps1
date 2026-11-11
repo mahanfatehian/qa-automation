@@ -1,5 +1,11 @@
 Set-Location -Path $PSScriptRoot
-docker compose up --build -d --scale chrome-node=2
+$count = 2
+$countFile = Join-Path $PSScriptRoot "runtime\browsers.txt"
+if (Test-Path $countFile) {
+  $raw = Get-Content $countFile -TotalCount 1
+  if ($raw -match '^\d+$') { $count = [int]$raw }
+}
+docker compose up --build -d --scale "chrome-node=$count"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host ""
 Write-Host "BlueprintQA is starting."

@@ -6,6 +6,7 @@ type StudioSettings = {
   ready_ms: number;
   window_width: number;
   window_height: number;
+  scale_note?: string;
   grid?: { ready: boolean; nodes: number; slots: number };
 };
 
@@ -28,8 +29,8 @@ export function SettingsDesk() {
     <section className="panel min-h-0 flex-1 overflow-auto p-4" data-testid="settings-desk">
       <h2 className="text-lg">Settings</h2>
       <p className="mb-4 text-sm text-[#999]">
-        Grid has {form.grid?.nodes ?? 0} browser nodes and {form.grid?.slots ?? 0} slots.
-        Zero browsers means use every slot the grid has.
+        Grid has {form.grid?.nodes ?? 0} Chrome browsers and {form.grid?.slots ?? 0} sessions.
+        Saving a number starts that many browsers. Zero keeps whatever is already up.
       </p>
       <div className="grid max-w-md gap-3">
         <label className="text-sm text-[#dcddde]">
@@ -48,7 +49,7 @@ export function SettingsDesk() {
           Window height
           <input className="btn mt-1 w-full" type="number" min={240} max={1200} value={form.window_height} onChange={(event) => set("window_height", Number(event.target.value))} />
         </label>
-        <button className="btn btn-run w-fit" onClick={() => api.saveSettings(form).then((next) => { setForm(next); setSaved("Saved"); }).catch((err: Error) => setSaved(err.message))}>Save</button>
+        <button className="btn btn-run w-fit" onClick={() => api.saveSettings(form).then((next) => { setForm(next); setSaved(next.scale_note || "Saved"); }).catch((err: Error) => setSaved(err.message))}>Save</button>
         {saved && <p className="text-sm text-[#999]">{saved}</p>}
       </div>
     </section>

@@ -53,9 +53,13 @@ async def inspect_hover(session_id: str, body: InspectHoverIn) -> dict:
 async def inspect_resolve(session_id: str, body: InspectResolveIn) -> dict:
     fingerprint = body.model_dump()
     selectors = synthesize("", fingerprint)
-    if not selectors:
-        html = await _cached_html(session_id, refresh=False)
-        selectors = synthesize(html, fingerprint)
+    stable = [item for item in selectors if int(item.get("rank") or 99) <= 6]
+    if stable:
+        return {"ok": True, "selectors": stable}
+    if selectors:
+        return {"ok": True, "selectors": selectors}
+    html = await _cached_html(session_id, refresh=False)
+    selectors = synthesize(html, fingerprint)
     if not selectors:
         html = await _cached_html(session_id, refresh=True)
         selectors = synthesize(html, fingerprint)

@@ -26,6 +26,8 @@ Thumbs.db
 *.tmp
 *.swp
 
+runtime/browsers.txt
+
 vault/.obsidian/workspace.json
 vault/.obsidian/workspace-mobile.json
 vault/.obsidian/cache/

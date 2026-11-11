@@ -67,6 +67,12 @@ public final class StepTargets {
 
     private static WebElement pass(List<String[]> candidates, int timeout, ExecutionContext context, ElementFinder finder, String emptyMessage) {
         int[] budgets = SelectorBudget.allocate(candidates.size(), timeout);
+        for (String[] candidate : candidates) {
+            WebElement ready = finder.hit(context.driver(), candidate[0], candidate[1]);
+            if (ready != null) {
+                return ready;
+            }
+        }
         RuntimeException last = null;
         for (int index = 0; index < candidates.size(); index++) {
             String[] candidate = candidates.get(index);
