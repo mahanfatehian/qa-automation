@@ -1,91 +1,163 @@
 # BlueprintQA
 
-Node-to-node browser tests. You draw a blueprint, connect white execution pins and colored data pins, and a Selenium Grid runs it. No test code required.
+Draw a browser test. Connect the steps. Press run. A real Chrome on Selenium Grid does the clicks, and the studio shows each step, its branch, and a screenshot.
 
-This is not a general automation builder. The graph is a QA blueprint: start a browser, open a page, find an element, click, type, read, branch, check.
+You do not write test code. You do not install Java, Node, or Python on the machine. Docker is the only requirement.
 
-## Run without a `.env`
+## What you need
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) on Windows or Mac, or Docker Engine plus the Compose plugin on Linux
+- About 8 GB of free disk for the first image build
+- These ports free: `3000`, `8000`, `4444`, `5432`, `6379`
+
+On Windows, start Docker Desktop and wait until it says it is running.
+
+## Start
+
+From this folder.
+
+Windows Command Prompt:
 
 ```bat
 up.bat
 ```
 
-or:
+Windows PowerShell:
+
+```powershell
+.\up.ps1
+```
+
+Mac, Linux, or Git Bash:
 
 ```bash
 docker compose up --build -d --scale chrome-node=2
 ```
 
-Defaults are already in `docker-compose.yml`. Copy `.env.example` only if you want to override them.
+If `make` is installed, `make up` does the same thing.
 
-| Surface | URL |
+The first start builds the Java runner and the studio. That can take several minutes. Later starts are faster. When the command returns, open:
+
+| What | URL |
 | --- | --- |
-| Blueprint studio | http://localhost:3000 |
+| Studio | http://localhost:3000 |
 | API docs | http://localhost:8000/docs |
 | Selenium Grid | http://localhost:4444 |
 
-First boot builds the Java runner and the UI. Open the studio and press **Load demo**, then **Run blueprint**.
+The studio is the app. Use http://localhost:3000. The page talks to the API for you. You do not open port 8000 to draw a blueprint.
 
-`make up` / `make down` / `make logs` / `make scale N=4` / `make clean` do the same thing when `make` is installed.
+Open a blueprint, or press **New**, then **Run blueprint**.
 
-Firefox nodes are optional:
+## If a port is already taken
+
+The usual clash is port 8000. Leave the studio on 3000 and move only the API.
+
+Windows Command Prompt:
+
+```bat
+set CONTROL_PLANE_PORT=8001
+up.bat
+```
+
+PowerShell:
+
+```powershell
+$env:CONTROL_PLANE_PORT = "8001"
+.\up.ps1
+```
+
+Bash:
 
 ```bash
-docker compose --profile firefox up -d
+CONTROL_PLANE_PORT=8001 docker compose up --build -d --scale chrome-node=2
 ```
+
+The studio stays at http://localhost:3000. API docs move to http://localhost:8001/docs. Copy `.env.example` to `.env` only if you want that port saved. You do not need a `.env` file when the defaults are free.
+
+If the studio page loads but every button fails, the studio proxy is pointing at an old API container. Restart just the studio:
+
+```bash
+docker compose restart frontend
+```
+
+## Stop, logs, reset
+
+Stop the stack and keep your blueprints:
+
+```bash
+docker compose down
+```
+
+`make down` is the same.
+
+Follow the API, the runner, and the grid:
+
+```bash
+docker compose logs -f --tail=200
+```
+
+`make logs` does the same.
+
+Delete the database, including saved blueprints and screenshots:
+
+```bash
+docker compose down -v --remove-orphans
+```
+
+`make clean` is the same. Do not run it unless you mean to wipe local data.
+
+## More than two browsers
+
+A blueprint that splits into two roads needs two free Chromes. The next start reads `runtime/browsers.txt` when that file exists.
+
+Start four Chromes now, without rebuilding:
+
+```bash
+docker compose up -d --scale chrome-node=4 --no-recreate --no-deps chrome-node
+```
+
+`make scale N=4` does the same. In the studio, **Settings → Browsers at once** asks the stack to match that number. `0` leaves the Chromes that are already up.
+
+Watch a Chrome window at http://localhost:7900. The others are 7901, 7902, and 7903.
 
 ## How a blueprint runs
 
-1. The studio saves the graph to the Python control plane.
-2. Run, cron, interval, or webhook puts a JSON job on Redis.
-3. The Java 21 runner walks execution pins, passes element/text pins in memory, and drives `RemoteWebDriver` on the grid.
-4. Each step reports running, passed, or failed, plus duration, output, and a screenshot.
-5. The studio paints the active node and keeps the screenshot in the bottom drawer.
+1. The studio saves the graph.
+2. Run, a clock, an interval, or a webhook puts a job on Redis.
+3. The runner walks the white pins, passes element and text pins in memory, and drives Chrome on the grid.
+4. Each step reports passed or failed, with a duration and a screenshot.
+5. A split gives each road its own Chrome, restored to the page where the road split.
 
-White pins order steps. Colored pins pass an element, text, or boolean. Do not mix those pin types.
+White pins order the steps. Colored pins pass an element, text, or a yes/no. Do not mix those colors.
 
-## Automatic runs
+A click counts only when the page shows it. A find counts only when the element is on the page. If a step fails, the run stops on that step and the screenshot is the page it actually saw.
 
-A blueprint can run on its own without becoming a different kind of product:
+## Clocks and CI
 
-- cron, for example `0 */6 * * *`
-- fixed interval, minimum 15 seconds
-- webhook for CI: `POST /api/v1/webhooks/trigger/{id}?token=...&wait=true`
-- JUnit XML: `GET /api/v1/runs/{id}/junit`
+In **Automation** you can add a cron or an interval. The shortest interval is 15 seconds. A scheduled run is skipped if that blueprint is already queued or running.
 
-Scheduled runs skip if that blueprint is already queued or running. Manual and webhook runs always enqueue.
+The webhook is on that same panel. From CI, with the stack already running:
+
+```bash
+curl -fsS -X POST "http://localhost:3000/api/v1/webhooks/trigger/WORKFLOW_ID?token=TOKEN&wait=true"
+```
+
+A failed blueprint returns 422. JUnit XML for a finished run is `GET /api/v1/runs/RUN_ID/junit`.
 
 ## Layout
 
 ```text
-frontend/        React blueprint studio
-control-plane/   FastAPI, Postgres, schedules, websocket feedback
-runner-engine/   Java 21 virtual threads + Selenium 4.52
-vault/           Obsidian notes for this map and later work
+frontend/        studio
+control-plane/   API, Postgres, schedules
+runner-engine/   Java 21 runner and Selenium
+e2e/             Playwright checks of the studio itself, not the product core
+vault/           notes
 ```
 
-The product dogfoods itself with Playwright. With the stack already running:
-
-```bat
-cd e2e
-npm install
-npm test
-```
-
-The suite uses the Chrome already installed on the machine (`channel: chrome`), so it does not need the Playwright browser download. `STUDIO_URL` defaults to `http://127.0.0.1:3000`. The tests click the studio the way a QA user would: open the canvas, load the fixture blueprint, save it, and run it on the grid.
-
-Open `vault/` as an Obsidian vault. `vault/07 SRS/` is the software requirements baseline for the final product. `vault/07 SRS/Development sequence.md` is the step order. `vault/00 Tracker/` is the work board. The product on `main` is not that final product yet.
+The product core is Selenium Grid Chrome. Playwright in `e2e/` only clicks the studio. You do not need it to run blueprints.
 
 Screenshots stay in the local Postgres volume until `make clean` or `docker compose down -v`.
 
-A running stack can be called from CI:
+## Before you put it on a network
 
-```yaml
-- run: curl -fsS -X POST "$BLUEPRINT_URL/api/v1/webhooks/trigger/$WORKFLOW_ID?token=$TOKEN&wait=true"
-```
-
-`$BLUEPRINT_URL` is the control plane, for example `http://localhost:8000`. A failed blueprint returns 422 and fails the job. The stack must already be running.
-
-## Notes before you expose it
-
-Local defaults use password `blueprint` and publish ports on the machine. Do not put this on the public internet until you add auth and change those passwords. Webhook tokens are per blueprint.
+The default database password is `blueprint`, there is no login, and the ports are published on the machine. This is a local tool. Do not expose it to the internet until you add auth and change that password. Webhook tokens are the only gate, and they are per blueprint.
