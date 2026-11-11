@@ -46,7 +46,10 @@ export function App() {
   function applyGraph(workflow: Workflow) {
     const graph = workflow.graph || { nodes: [], edges: [] };
     setName(workflow.name);
-    setNodes((graph.nodes || []) as Node<BlueprintData>[]);
+    setNodes(((graph.nodes || []) as Node<BlueprintData>[]).map((node, index) => ({
+      ...node,
+      position: node.position ?? { x: 80 + index * 40, y: 120 },
+    })));
     setEdges((graph.edges || []) as Edge[]);
     setSelectedId(null);
     setDirty(false);
@@ -169,7 +172,7 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#0b141e] px-3">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#0b141e] px-3" data-testid="studio-header">
         <div className="grid h-7 w-7 place-items-center bg-[#49c2ff] text-xs font-bold text-[#081018]" style={{ clipPath: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)" }}>B</div>
         <div>
           <p className="text-sm font-semibold leading-4">BlueprintQA</p>

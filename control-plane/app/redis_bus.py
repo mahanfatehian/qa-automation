@@ -48,7 +48,7 @@ def clean_node(node: dict) -> dict:
         "id": node.get("id"),
         "type": kind,
         "data": data,
-        "position": node.get("position") or {},
+        "position": node.get("position") or {"x": 0, "y": 0},
     }
 
 

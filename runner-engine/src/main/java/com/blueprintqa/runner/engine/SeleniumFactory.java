@@ -3,6 +3,7 @@ package com.blueprintqa.runner.engine;
 import com.blueprintqa.runner.config.SeleniumConfig;
 import com.blueprintqa.runner.model.GraphNode;
 import org.openqa.selenium.Dimension;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxOptions;
@@ -72,7 +73,8 @@ public class SeleniumFactory {
         if (headless) {
             options.addArguments("--headless=new");
         }
-        options.addArguments("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=" + width + "," + height);
+        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
+        options.addArguments("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-extensions", "--window-size=" + width + "," + height);
         options.setAcceptInsecureCerts(true);
         if (sessionName != null && !sessionName.isBlank()) {
             options.setCapability("se:name", sessionName);

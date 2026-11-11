@@ -64,6 +64,16 @@ runner-engine/   Java 21 virtual threads + Selenium 4.52
 vault/           Obsidian notes for this map and later work
 ```
 
+The product dogfoods itself with Playwright. With the stack already running:
+
+```bat
+cd e2e
+npm install
+npm test
+```
+
+The suite uses the Chrome already installed on the machine (`channel: chrome`), so it does not need the Playwright browser download. `STUDIO_URL` defaults to `http://127.0.0.1:3000`. The tests click the studio the way a QA user would: open the canvas, load the fixture blueprint, save it, and run it on the grid.
+
 Open `vault/` as an Obsidian vault. `vault/07 SRS/` is the software requirements baseline for the final product. `vault/07 SRS/Development sequence.md` is the step order. `vault/00 Tracker/` is the work board. The product on `main` is not that final product yet.
 
 Screenshots stay in the local Postgres volume until `make clean` or `docker compose down -v`.

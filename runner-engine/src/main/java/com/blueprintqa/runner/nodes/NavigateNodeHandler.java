@@ -27,10 +27,26 @@ public class NavigateNodeHandler implements NodeHandler {
         }
         int timeout = Math.max(5, node.integer("timeoutSeconds", 30));
         context.driver().manage().timeouts().pageLoadTimeout(Duration.ofSeconds(timeout));
-        context.driver().navigate().to(url);
-        new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(driver ->
-                "complete".equals(((JavascriptExecutor) driver).executeScript("return document.readyState"))
-        );
+        Exception last = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                context.driver().navigate().to(url);
+                new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(driver -> {
+                    Object state = ((JavascriptExecutor) driver).executeScript("return document.readyState");
+                    return "complete".equals(state) || "interactive".equals(state);
+                });
+                last = null;
+                break;
+            } catch (Exception ex) {
+                last = ex;
+                if (attempt == 3) {
+                    throw new IllegalStateException("Open page failed for " + url + ": " + ex.getMessage(), ex);
+                }
+            }
+        }
+        if (last != null) {
+            throw new IllegalStateException("Open page failed for " + url, last);
+        }
         String current = context.driver().getCurrentUrl();
         NodeOutput output = NodeOutput.pass(current);
         output.pins.put("text_out", current);

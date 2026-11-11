@@ -14,7 +14,7 @@ export function LiveRunOverlay({ run, events, shot, runs, onPick, onOpenRun }: P
   return (
     <section className="panel grid h-52 shrink-0 grid-cols-[280px_1fr_280px] border-t border-line">
       <div className="overflow-auto border-r border-line p-3">
-        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6bb]">
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6bb]" data-testid="run-status">
           Run {run ? run.status : "idle"} {run ? `· ${run.trigger}` : ""}
         </p>
         <div className="mb-2 flex flex-wrap gap-1">

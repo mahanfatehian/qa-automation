@@ -1,4 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
+import { CATALOG_BY_TYPE } from "./catalog";
 import type { BlueprintData } from "./types/blueprint";
 
 export const FIXTURE_URL = "http://control-plane:8000/fixtures/lab.html";
@@ -88,7 +89,7 @@ function node(id: string, type: string, x: number, y: number, data: Record<strin
     id,
     type,
     position: { x, y },
-    data: { nodeType: type, title: type, ...data },
+    data: { nodeType: type, title: CATALOG_BY_TYPE[type]?.title || type, ...data },
   };
 }
 

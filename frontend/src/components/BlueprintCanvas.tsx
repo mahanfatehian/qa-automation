@@ -84,7 +84,7 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
   }, []);
 
   return (
-    <div className="relative min-w-0 flex-1" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
+    <div className="relative min-w-0 flex-1" data-testid="blueprint-canvas" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
