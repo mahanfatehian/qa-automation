@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import type { Schedule } from "../types/blueprint";
 
+type RunRow = { id: string; status: string; trigger: string; created_at: string; variation_label?: string | null; error_message?: string | null };
+
 type Props = {
   workflowId: string | null;
   workflowName: string;
   webhookToken: string;
-  runs: Array<{ id: string; status: string; trigger: string; created_at: string; variation_label?: string | null; error_message?: string | null }>;
+  runs: RunRow[];
+  activeRunId?: string | null;
+  onOpen: (run: RunRow) => void;
 };
 
 const presets = [
@@ -16,16 +20,22 @@ const presets = [
   { label: "Every 15 minutes from now", type: "INTERVAL" as const, cron: null, interval: 900 },
 ];
 
-export function AutomationDesk({ workflowId, workflowName, webhookToken, runs }: Props) {
+export function AutomationDesk({ workflowId, workflowName, webhookToken, runs, activeRunId, onOpen }: Props) {
   const [rows, setRows] = useState<Schedule[]>([]);
   const [cron, setCron] = useState("0 9 * * *");
   const [error, setError] = useState("");
-  const [logs, setLogs] = useState<Array<{ id: string; level: string; message: string; created_at: string }>>([]);
+  const [logs, setLogs] = useState<Array<{ id: string; run_id?: string | null; level: string; message: string; created_at: string }>>([]);
 
   useEffect(() => {
     if (!workflowId) return;
-    api.schedules(workflowId).then(setRows).catch((err: Error) => setError(err.message));
-    api.automationLogs(workflowId).then(setLogs).catch(() => undefined);
+    let stop = false;
+    const load = () => {
+      api.schedules(workflowId).then((rows) => { if (!stop) setRows(rows); }).catch((err: Error) => { if (!stop) setError(err.message); });
+      api.automationLogs(workflowId).then((rows) => { if (!stop) setLogs(rows); }).catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 4000);
+    return () => { stop = true; window.clearInterval(timer); };
   }, [workflowId]);
 
   if (!workflowId) {
@@ -78,12 +88,15 @@ export function AutomationDesk({ workflowId, workflowName, webhookToken, runs }:
       </ul>
       <p className="mb-2 mt-6 font-mono text-[10px] uppercase tracking-[0.14em] text-[#999]">Runs of {workflowName || "this blueprint"}</p>
       <ul className="mb-4 space-y-1 text-sm">
-        {runs.slice(0, 12).map((run) => (
-          <li key={run.id} className="border-b border-line py-1">
-            <span className={run.status === "PASSED" ? "text-[#7d9a6a]" : run.status === "FAILED" ? "text-[#d46a6a]" : "text-[#7f6df2]"}>{run.status.toLowerCase()}</span>
-            <span className="ml-2">{workflowName}</span>
-            <span className="ml-2 text-[#999]">{run.trigger.toLowerCase()}</span>
-            <span className="ml-2 text-[#dcddde]">{run.variation_label || "single run"}</span>
+        {runs.map((run) => (
+          <li key={run.id}>
+            <button className={`flex w-full items-center border-b border-line py-1 text-left ${activeRunId === run.id ? "bg-[#2a2a2a]" : ""}`} onClick={() => onOpen(run)}>
+              <span className={run.status === "PASSED" ? "text-[#7d9a6a]" : run.status === "FAILED" ? "text-[#d46a6a]" : "text-[#7f6df2]"}>{run.status.toLowerCase()}</span>
+              <span className="ml-2">{workflowName}</span>
+              <span className="ml-2 text-[#999]">{run.trigger.toLowerCase()}</span>
+              <span className="ml-2 text-[#dcddde]">{run.variation_label || "single run"}</span>
+              <span className="ml-auto text-[#999]">{run.created_at.slice(11, 16)}</span>
+            </button>
           </li>
         ))}
         {runs.length === 0 && <li className="text-[#999]">No runs of this blueprint yet.</li>}
@@ -91,8 +104,13 @@ export function AutomationDesk({ workflowId, workflowName, webhookToken, runs }:
       <p className="mb-2 mt-6 font-mono text-[10px] uppercase tracking-[0.14em] text-[#999]">Automation log</p>
       <ul className="mb-4 space-y-1 text-sm">
         {logs.map((item) => (
-          <li key={item.id} className={item.level === "error" ? "text-[#d46a6a]" : item.level === "warn" ? "text-[#d4a017]" : "text-[#dcddde]"}>
-            {item.created_at.slice(11, 16)} · {item.message}
+          <li key={item.id}>
+            <button
+              className={`block w-full py-1 text-left ${item.level === "error" ? "text-[#d46a6a]" : item.level === "warn" ? "text-[#d4a017]" : "text-[#dcddde]"} ${item.run_id ? "hover:bg-[#2a2a2a]" : ""}`}
+              onClick={() => { if (item.run_id) onOpen({ id: item.run_id, status: item.level === "error" ? "FAILED" : "PASSED", trigger: "CRON", created_at: item.created_at, variation_label: item.message }); }}
+            >
+              {item.created_at.slice(11, 16)} · {item.message}
+            </button>
           </li>
         ))}
         {logs.length === 0 && <li className="text-[#999]">No automatic run has finished yet.</li>}

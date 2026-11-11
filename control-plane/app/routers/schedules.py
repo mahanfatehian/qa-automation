@@ -35,7 +35,7 @@ async def list_schedules(workflow_id: UUID, db: AsyncSession = Depends(get_db)) 
 async def automation_logs(workflow_id: UUID, db: AsyncSession = Depends(get_db)) -> list[ScheduleLog]:
     rows = (
         await db.execute(
-            select(ScheduleLog).where(ScheduleLog.workflow_id == workflow_id).order_by(ScheduleLog.created_at.desc()).limit(30)
+            select(ScheduleLog).where(ScheduleLog.workflow_id == workflow_id).order_by(ScheduleLog.created_at.desc()).limit(100)
         )
     ).scalars().all()
     return list(rows)
