@@ -186,34 +186,52 @@ public final class Pointer {
 
     public static void settle(WebDriver driver) {
         try {
-            new WebDriverWait(driver, Duration.ofSeconds(3)).until(d ->
+            new WebDriverWait(driver, Duration.ofSeconds(4)).until(d ->
                     "complete".equals(((JavascriptExecutor) d).executeScript("return document.readyState"))
             );
         } catch (Exception ignored) {
-            // interactive is enough if the site never reaches complete
+            // a site that never finishes loading can still be acted on; the shot must not be the spinner
         }
-        int cap = Math.min(5000, Math.max(0, GridBudget.readyMs));
-        if (cap == 0) {
-            return;
-        }
+        int cap = Math.max(6000, Math.min(12000, Math.max(GridBudget.readyMs, 6000)));
         long start = System.currentTimeMillis();
-        long quietSince = start;
-        long last = mutation(driver);
+        int steady = 0;
         while (System.currentTimeMillis() - start < cap) {
-            long nowMut = mutation(driver);
-            long now = System.currentTimeMillis();
-            if (nowMut != last) {
-                last = nowMut;
-                quietSince = now;
-            } else if (now - quietSince >= 120L) {
-                return;
+            if (painted(driver)) {
+                steady++;
+                if (steady >= 2) {
+                    return;
+                }
+            } else {
+                steady = 0;
             }
             try {
-                Thread.sleep(40L);
+                Thread.sleep(180L);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 return;
             }
+        }
+    }
+
+    public static boolean painted(WebDriver driver) {
+        try {
+            Object value = ((JavascriptExecutor) driver).executeScript("""
+                    const text = (document.body && document.body.innerText || '').replace(/\\s+/g, ' ').trim();
+                    const main = document.querySelector('main, [role="main"], #__next, #app');
+                    const mainText = (main && main.innerText || '').replace(/\\s+/g, ' ').trim();
+                    const center = document.elementFromPoint(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
+                    const box = center ? center.getBoundingClientRect() : null;
+                    const centerText = (center && (center.innerText || center.textContent) || '').trim();
+                    const tinyCenter = !!(box && box.width < 120 && box.height < 80 && centerText.length < 4);
+                    const busy = !!document.querySelector('[aria-busy="true"], [class*="skeleton" i], [class*="Spinner" i], [class*="loading" i]');
+                    if (text.length < 40) return false;
+                    if (tinyCenter && mainText.length < 40) return false;
+                    if (busy && mainText.length < 80) return false;
+                    return mainText.length > 40 || text.length > 180;
+                    """);
+            return Boolean.TRUE.equals(value);
+        } catch (RuntimeException ex) {
+            return false;
         }
     }
 

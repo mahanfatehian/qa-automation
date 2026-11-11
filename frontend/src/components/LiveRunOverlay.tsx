@@ -199,19 +199,45 @@ function collapse(events: TelemetryEvent[]) {
   const rank = (kind: string) => kind.endsWith("FAILED") ? 3 : kind.endsWith("PASSED") ? 2 : 1;
   const rows: TelemetryEvent[] = [];
   const open = new Map<string, number>();
+  const bare = new Map<string, number>();
   for (const event of events) {
     if (!event.event_type?.startsWith("NODE_") || !event.node_id) continue;
-    const id = `${branchOf(event)}:${event.node_id}`;
+    const branch = branchOf(event);
+    const id = `${branch}:${event.node_id}`;
+    const terminal = !event.event_type.endsWith("RUNNING");
+    if (terminal && !branch && bare.has(event.node_id)) {
+      const at = bare.get(event.node_id) ?? 0;
+      if (rank(event.event_type) >= rank(rows[at].event_type)) rows[at] = event;
+      bare.delete(event.node_id);
+      open.set(id, at);
+      continue;
+    }
+    if (terminal && branch && bare.has(event.node_id)) {
+      const at = bare.get(event.node_id) ?? 0;
+      if (rows[at]?.event_type.endsWith("RUNNING")) {
+        rows[at] = event;
+        bare.delete(event.node_id);
+        open.set(id, at);
+        continue;
+      }
+    }
     if (event.event_type.endsWith("RUNNING") || !open.has(id)) {
       open.set(id, rows.length);
+      if (!branch) bare.set(event.node_id, rows.length);
       rows.push(event);
       continue;
     }
     const at = open.get(id) ?? rows.length - 1;
     if (rank(event.event_type) >= rank(rows[at].event_type)) rows[at] = event;
-    if (!event.event_type.endsWith("RUNNING")) open.delete(id);
+    if (terminal) {
+      open.delete(id);
+      bare.delete(event.node_id);
+    }
   }
-  return rows;
+  return rows.filter((event, index, all) => {
+    if (!event.event_type.endsWith("RUNNING")) return true;
+    return !all.some((other, otherIndex) => otherIndex !== index && other.node_id === event.node_id && !other.event_type.endsWith("RUNNING"));
+  });
 }
 
 function branchOf(event: TelemetryEvent) {

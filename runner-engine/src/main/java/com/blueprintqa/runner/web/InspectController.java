@@ -2,6 +2,7 @@ package com.blueprintqa.runner.web;
 
 import com.blueprintqa.runner.engine.ActiveSessions;
 import com.blueprintqa.runner.engine.DagExecutorService;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.model.GraphEdge;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.WorkflowJob;
@@ -229,6 +230,7 @@ public class InspectController {
     }
 
     private Map<String, Object> shot(WebDriver driver) {
+        Pointer.settle(driver);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("currentUrl", driver.getCurrentUrl());
         result.put("title", driver.getTitle());

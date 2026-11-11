@@ -314,29 +314,16 @@ export function App() {
           rows={examples}
           probing={probing}
           probeMessage={probeMessage}
-          onPick={async (node) => {
+          onPick={(node) => {
             const opener = nodes.find((item) => item.data.nodeType === "NAVIGATE");
-            const url = String(opener?.data.url || "");
-            if (!url) {
+            if (!String(opener?.data.url || "")) {
               setPickError("Add an Open page step with a URL first.");
               setPickOpen(true);
-              setPickResult(null);
               return;
             }
             setPickNodeId(node.id);
-            setPickOpen(true);
-            setPickBusy(true);
             setPickError("");
-            setPickResult(null);
-            try {
-              const result = await api.pick({ url, browser: "chrome", headless: false });
-              setPickResult(result);
-              if (!result.ok) setPickError(result.error || "Pick failed");
-            } catch (err) {
-              setPickError(err instanceof Error ? err.message : "Pick failed");
-            } finally {
-              setPickBusy(false);
-            }
+            setPickOpen(true);
           }}
           onChange={(id, patch) => {
             remember();

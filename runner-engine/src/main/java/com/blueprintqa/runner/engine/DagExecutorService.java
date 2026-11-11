@@ -104,6 +104,9 @@ public class DagExecutorService {
                 driver.navigate().to(url);
             }
         }
+        if (!Pointer.painted(driver)) {
+            Pointer.settle(driver);
+        }
         return driver;
     }
 
@@ -201,7 +204,7 @@ public class DagExecutorService {
         resolveInputs(node, job, context);
         borrowSelector(node, job);
         long started = System.nanoTime();
-        telemetry.publish(job, "NODE_RUNNING", node.id, node.semanticType(), 0, "", "", Map.of(), "");
+        telemetry.publish(job, "NODE_RUNNING", node.id, node.semanticType(), 0, branched(context, ""), "", stepDetail(node, context, Map.of()), "");
         NodeOutput output;
         try {
             if ("LOOP_ELEMENTS".equals(node.semanticType())) {
@@ -491,6 +494,10 @@ public class DagExecutorService {
             return "";
         }
         try {
+            if (!Pointer.painted(driver)) {
+                Pointer.settle(driver);
+            }
+            Pointer.paint(driver);
             return shots.getScreenshotAs(OutputType.BASE64);
         } catch (Exception ex) {
             return "";
