@@ -1,14 +1,14 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { CATALOG_BY_TYPE } from "../../catalog";
+import { CATALOG_BY_TYPE, CLAUSE, CLAUSE_COLOR } from "../../catalog";
 import type { BlueprintData, PinKind } from "../../types/blueprint";
 
 export type FlowNode = Node<BlueprintData, string>;
 
-const headerColor: Record<string, string> = {
-  flow: "#ff5d73",
-  action: "#49c2ff",
-  search: "#3ddc97",
-  assert: "#ffb020",
+const clauseLabel: Record<string, string> = {
+  given: "Given",
+  when: "When",
+  then: "Then",
+  flow: "And",
 };
 
 const pinColor: Record<PinKind, string> = {
@@ -24,9 +24,11 @@ export function BlueprintNode({ data, selected }: NodeProps<FlowNode>) {
   const outputs = def?.pins.filter((pin) => pin.direction === "out") ?? [];
   const rows = Math.max(inputs.length, outputs.length, 1);
   const status = String(data.runStatus || "idle");
+  const clause = CLAUSE[String(data.nodeType || "")] || "when";
   return (
     <div className={`bp-node status-${status} ${selected ? "is-selected" : ""}`} style={{ minHeight: 34 + rows * 22 }}>
-      <div className="bp-head" style={{ background: headerColor[def?.category || "action"] }}>
+      <div className="bp-head" style={{ background: CLAUSE_COLOR[clause] }}>
+        <span className="mr-1 font-mono text-[9px] uppercase opacity-70">{clauseLabel[clause]}</span>
         {String(data.title || def?.title || data.nodeType)}
       </div>
       {inputs.map((pin, index) => (

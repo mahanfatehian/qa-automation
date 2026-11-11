@@ -67,4 +67,6 @@ Start already chooses browser, headless, and window size. The graph also needs:
 
 If Selenium can do it as a normal browser assertion or input, it belongs as a blueprint step with fields, not as a code box. Do not add Slack, email, or generic HTTP nodes to satisfy this list.
 
+The palette groups these as Given, When, and Then. That is the procedure shape, not a Cucumber runtime. See [[Given When Then]].
+
 See [[Development sequence]] step 6 and [[Requirement register]].

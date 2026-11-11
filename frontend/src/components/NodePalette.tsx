@@ -1,20 +1,20 @@
-import { CATALOG } from "../catalog";
+import { CATALOG, CLAUSE } from "../catalog";
 
 const groups = [
-  { id: "flow", label: "Flow" },
-  { id: "action", label: "Browser" },
-  { id: "search", label: "Find / read" },
-  { id: "assert", label: "Check" },
+  { id: "given", label: "Given", note: "setup" },
+  { id: "when", label: "When", note: "act" },
+  { id: "then", label: "Then", note: "check" },
+  { id: "flow", label: "And", note: "branch" },
 ] as const;
 
 export function NodePalette() {
   return (
     <aside className="panel w-56 shrink-0 overflow-auto border-r border-line p-3">
-      <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#8ea6bb]">Blueprint steps</p>
+      <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#8ea6bb]">Scenario steps</p>
       {groups.map((group) => (
         <div key={group.id} className="mb-4">
-          <p className="mb-1 text-[11px] text-[#8ea6bb]">{group.label}</p>
-          {CATALOG.filter((step) => step.category === group.id).map((step) => (
+          <p className="mb-1 text-[11px] text-[#8ea6bb]">{group.label} <span className="text-[#5f7690]">{group.note}</span></p>
+          {CATALOG.filter((step) => (CLAUSE[step.type] || "when") === group.id).map((step) => (
             <button
               key={step.type}
               draggable
@@ -29,7 +29,7 @@ export function NodePalette() {
           ))}
         </div>
       ))}
-      <p className="font-mono text-[10px] leading-4 text-[#8ea6bb]">White pins order steps. Colored pins pass an element or text.</p>
+      <p className="font-mono text-[10px] leading-4 text-[#8ea6bb]">Given sets the page. When acts. Then checks. White pins still order the steps.</p>
     </aside>
   );
 }

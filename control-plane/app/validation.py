@@ -39,6 +39,7 @@ KNOWN_TYPES = {
     "ALERT",
     "UPLOAD",
     "GO_BACK",
+    "GO_FORWARD",
     "VERIFY",
     "SET_CHECKBOX",
     "DOUBLE_CLICK",

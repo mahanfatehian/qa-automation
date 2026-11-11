@@ -1,5 +1,6 @@
 package com.blueprintqa.runner.nodes;
 
+import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
@@ -12,6 +13,12 @@ import java.time.Duration;
 
 @Component
 public class WaitNodeHandler implements NodeHandler {
+    private final ElementFinder finder;
+
+    public WaitNodeHandler(ElementFinder finder) {
+        this.finder = finder;
+    }
+
     @Override
     public String type() {
         return "WAIT";
@@ -22,6 +29,16 @@ public class WaitNodeHandler implements NodeHandler {
         String waitType = node.str("waitType", "FIXED_MS");
         String value = context.interpolate(node.str("value", "1000"));
         int timeout = Math.max(1, node.integer("timeoutSeconds", 15));
+        if ("ELEMENT_VISIBLE".equals(waitType) || "ELEMENT_CLICKABLE".equals(waitType)) {
+            String query = context.interpolate(node.str("xpath", value == null ? "" : value));
+            var element = finder.find(context.driver(), node.str("strategy", "XPATH"), query, timeout);
+            new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(
+                    "ELEMENT_CLICKABLE".equals(waitType)
+                            ? ExpectedConditions.elementToBeClickable(element)
+                            : ExpectedConditions.visibilityOf(element)
+            );
+            return NodeOutput.pass("Element ready");
+        }
         if ("URL_CONTAINS".equals(waitType)) {
             new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(ExpectedConditions.urlContains(value == null ? "" : value));
             return NodeOutput.pass("URL matched");

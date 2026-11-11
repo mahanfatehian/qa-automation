@@ -232,6 +232,14 @@ export const CATALOG: StepDef[] = [
     defaults: { label: "Checkpoint" },
   },
   {
+    type: "GO_FORWARD",
+    title: "Go forward",
+    category: "action",
+    hint: "Moves forward one page in the browser history.",
+    pins: [execIn, execOut, { id: "text_out", label: "url", kind: "text", direction: "out" }],
+    defaults: { timeoutSeconds: 15 },
+  },
+  {
     type: "GO_BACK",
     title: "Go back",
     category: "action",
@@ -240,6 +248,47 @@ export const CATALOG: StepDef[] = [
     defaults: { timeoutSeconds: 15 },
   },
 ];
+
+export type Clause = "given" | "when" | "then" | "flow";
+
+export const CLAUSE: Record<string, Clause> = {
+  START: "given",
+  NAVIGATE: "given",
+  COOKIE: "given",
+  WAIT: "given",
+  ENTER_FRAME: "given",
+  LEAVE_FRAME: "given",
+  SWITCH_TAB: "given",
+  CLICK: "when",
+  DOUBLE_CLICK: "when",
+  RIGHT_CLICK: "when",
+  TYPE_TEXT: "when",
+  SELECT_OPTION: "when",
+  SET_CHECKBOX: "when",
+  PRESS_KEY: "when",
+  HOVER: "when",
+  SCROLL: "when",
+  UPLOAD: "when",
+  DRAG_DROP: "when",
+  ALERT: "when",
+  REFRESH: "when",
+  GO_BACK: "when",
+  GO_FORWARD: "when",
+  SEARCH_ELEMENT: "when",
+  EXTRACT_CONTENT: "when",
+  ASSERT: "then",
+  VERIFY: "then",
+  SCREENSHOT: "then",
+  IF_CONDITION: "flow",
+  LOOP_ELEMENTS: "flow",
+};
+
+export const CLAUSE_COLOR: Record<Clause, string> = {
+  given: "#2fbfae",
+  when: "#49c2ff",
+  then: "#ffb020",
+  flow: "#ff5d73",
+};
 
 export const CATALOG_BY_TYPE = Object.fromEntries(CATALOG.map((step) => [step.type, step]));
 

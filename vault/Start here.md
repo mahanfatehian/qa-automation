@@ -15,6 +15,7 @@ The final product is specified. The current branch is not that product.
 - [[Map.canvas]] is the same map on a canvas.
 - [[15 Final acceptance]] is what "full ready" means.
 - [[QA node taxonomy]] is the needed consideration: assertions, inputs, verify, and search, not only procedure steps.
+- [[Given When Then]] is that consideration as a scenario. Cucumber is not a dependency.
 - [[Blueprint not n8n]]
 - [[Direction correction]]
 

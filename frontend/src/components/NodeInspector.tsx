@@ -88,7 +88,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       {data.nodeType === "LOOP_ELEMENTS" && <Area label="XPath" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />}
       {data.nodeType === "WAIT" && (
         <>
-          <Select label="Wait for" value={String(data.waitType || "FIXED_MS")} options={["FIXED_MS", "URL_CONTAINS", "NETWORK_IDLE"]} onChange={(waitType) => set({ waitType })} />
+          <Select label="Wait for" value={String(data.waitType || "FIXED_MS")} options={["FIXED_MS", "URL_CONTAINS", "NETWORK_IDLE", "ELEMENT_VISIBLE", "ELEMENT_CLICKABLE"]} onChange={(waitType) => set({ waitType })} />
           <Text label="Value" value={String(data.value || "")} onChange={(value) => set({ value })} />
         </>
       )}
