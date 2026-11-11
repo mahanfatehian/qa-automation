@@ -45,7 +45,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
         </>
       )}
       {["SEARCH_ELEMENT", "CLICK", "TYPE_TEXT", "EXTRACT_CONTENT", "HOVER", "SCROLL", "SELECT_OPTION", "UPLOAD", "ENTER_FRAME"].includes(String(data.nodeType)) && (
-        <button className="btn mb-3 w-full" onClick={() => onPick(node)}>Pick element</button>
+        <button className="btn mb-3 w-full" onClick={() => onPick(node)}>Select on page</button>
       )}
       {data.nodeType === "SEARCH_ELEMENT" && (
         <>

@@ -4,7 +4,7 @@ import { BlueprintCanvas } from "./components/BlueprintCanvas";
 import { LiveRunOverlay } from "./components/LiveRunOverlay";
 import { NodeInspector } from "./components/NodeInspector";
 import { NodePalette } from "./components/NodePalette";
-import { PickerModal } from "./components/PickerModal";
+import { InspectModal } from "./components/InspectModal";
 import { ExamplesModal } from "./components/ExamplesModal";
 import { ScheduleModal } from "./components/ScheduleModal";
 import { demoGraph, fixtureActionsGraph, fixtureGraph, starterNodes } from "./demo";
@@ -277,16 +277,34 @@ export function App() {
       <LiveRunOverlay run={run} events={events} shot={shot} runs={runs} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
       <ScheduleModal open={scheduleOpen} workflowId={activeId} webhookToken={active?.webhook_token || ""} onClose={() => setScheduleOpen(false)} />
       <ExamplesModal open={examplesOpen} rows={examples} onClose={() => setExamplesOpen(false)} onChange={(rows) => { setExamples(rows); setDirty(true); }} />
-      <PickerModal
+      <InspectModal
         open={pickOpen}
-        busy={pickBusy}
-        result={pickResult}
-        error={pickError}
+        nodes={nodes}
+        edges={edges}
+        stopBefore={pickNodeId}
         onClose={() => setPickOpen(false)}
-        onChoose={(strategy, query) => {
+        onUse={(stepType, strategy, query) => {
           if (!pickNodeId) return;
           setDirty(true);
-          setNodes((current) => current.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, strategy, query, xpath: query } } : node));
+          const current = nodes.find((node) => node.id === pickNodeId);
+          if (current && current.data.nodeType === stepType) {
+            setNodes((items) => items.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, strategy, query, xpath: query } } : node));
+          } else if (current) {
+            const id = `n_${crypto.randomUUID().slice(0, 8)}`;
+            setNodes((items) => items.concat({
+              id,
+              type: stepType,
+              position: { x: current.position.x + 280, y: current.position.y },
+              data: { nodeType: stepType, strategy, query, xpath: query },
+            }));
+            setEdges((items) => items.concat({
+              id: `e_${id}`,
+              source: current.id,
+              target: id,
+              sourceHandle: "exec_out",
+              targetHandle: "exec_in",
+            }));
+          }
           setPickOpen(false);
         }}
       />

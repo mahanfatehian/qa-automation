@@ -86,6 +86,18 @@ class NodeResultOut(BaseModel):
     created_at: datetime
 
 
+class InspectStartIn(BaseModel):
+    nodes: list = Field(default_factory=list)
+    edges: list = Field(default_factory=list)
+    stop_before: str | None = None
+    variables: dict = Field(default_factory=dict)
+
+
+class InspectHoverIn(BaseModel):
+    x: int
+    y: int
+
+
 class PickIn(BaseModel):
     url: str
     browser: str = "chrome"

@@ -48,6 +48,42 @@ export const api = {
     }),
   pick: (body: { url: string; browser?: string; headless?: boolean }) =>
     request<PickResult>("/api/v1/tools/pick", { method: "POST", body: JSON.stringify(body) }),
+  inspectStart: (body: { nodes: unknown[]; edges: unknown[]; stop_before?: string; variables?: Record<string, unknown> }) =>
+    request<InspectSession>("/api/v1/tools/inspect/start", { method: "POST", body: JSON.stringify(body) }),
+  inspectHover: (sessionId: string, x: number, y: number) =>
+    request<{ ok: boolean; element: InspectElement | null; error?: string }>(`/api/v1/tools/inspect/${sessionId}/hover`, {
+      method: "POST",
+      body: JSON.stringify({ x, y }),
+    }),
+  inspectClose: (sessionId: string) => request<void>(`/api/v1/tools/inspect/${sessionId}/close`, { method: "POST" }),
+};
+
+export type InspectElement = {
+  tag: string;
+  type: string;
+  kind: string;
+  text: string;
+  name: string;
+  id: string;
+  placeholder: string;
+  aria: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  options: Array<{ text: string; value: string }>;
+  selectors: Array<{ kind: string; value: string }>;
+  suggested: string[];
+};
+
+export type InspectSession = {
+  ok: boolean;
+  session_id: string;
+  current_url: string;
+  title: string;
+  screenshot_base64: string;
+  viewport: { width?: number; height?: number };
+  error?: string;
 };
 
 export type PickResult = {

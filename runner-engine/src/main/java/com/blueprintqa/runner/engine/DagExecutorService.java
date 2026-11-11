@@ -70,6 +70,34 @@ public class DagExecutorService {
         }
     }
 
+    public WebDriver openContext(WorkflowJob job, String stopBefore) {
+        GraphNode start = job.start();
+        WebDriver driver = selenium.open(start, "inspect", 2);
+        sessions.add(driver);
+        replayNode(start, job, new ExecutionContext(driver, job.variables), stopBefore, new int[]{0});
+        return driver;
+    }
+
+    private void replayNode(GraphNode node, WorkflowJob job, ExecutionContext context, String stopBefore, int[] steps) {
+        if (node == null || (stopBefore != null && stopBefore.equals(node.id)) || steps[0]++ >= 80) {
+            return;
+        }
+        resolveInputs(node, job, context);
+        try {
+            if ("LOOP_ELEMENTS".equals(node.semanticType())) {
+                return;
+            }
+            NodeOutput output = registry.get(node.semanticType()).execute(node, context);
+            store(node, output, context);
+            String handle = output.nextExec == null || output.nextExec.isBlank() ? "exec_out" : output.nextExec;
+            for (GraphNode next : successors(job, node.id, handle)) {
+                replayNode(next, job, context, stopBefore, steps);
+            }
+        } catch (Exception ex) {
+            throw new IllegalStateException("Could not reach the page state: " + ex.getMessage(), ex);
+        }
+    }
+
     private void runNode(GraphNode node, WorkflowJob job, ExecutionContext context, int[] steps) {
         int guard = job.maxSteps <= 0 ? 500 : job.maxSteps;
         if (steps[0]++ >= guard) {
