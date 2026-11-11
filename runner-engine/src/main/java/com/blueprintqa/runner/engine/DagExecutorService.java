@@ -494,9 +494,7 @@ public class DagExecutorService {
             return "";
         }
         try {
-            if (!Pointer.painted(driver)) {
-                Pointer.settle(driver);
-            }
+            Pointer.settleForShot(driver);
             Pointer.paint(driver);
             return shots.getScreenshotAs(OutputType.BASE64);
         } catch (Exception ex) {

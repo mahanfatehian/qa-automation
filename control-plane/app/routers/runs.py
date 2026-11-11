@@ -54,7 +54,9 @@ async def list_results(run_id: UUID, db: AsyncSession = Depends(get_db)) -> list
     rows = (
         await db.execute(select(NodeResult).where(NodeResult.run_id == run_id).order_by(NodeResult.sequence))
     ).scalars().all()
-    return [to_result(row) for row in rows]
+    finished = {row.node_id for row in rows if row.status in {"PASSED", "FAILED", "ERROR"} and row.node_id}
+    visible = [row for row in rows if not (row.status == "RUNNING" and row.node_id in finished)]
+    return [to_result(row) for row in visible]
 
 
 @router.get("/{run_id}/results/{result_id}/screenshot")

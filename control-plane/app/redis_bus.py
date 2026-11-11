@@ -242,24 +242,47 @@ async def handle_event(raw: dict) -> None:
             run.error_message = (event.get("message") or "Blueprint failed")[:4000]
             await note_scheduled(session, run, "error")
         elif kind in {"NODE_RUNNING", "NODE_PASSED", "NODE_FAILED"}:
-            count = await session.scalar(
-                select(func.count()).select_from(NodeResult).where(NodeResult.run_id == rid)
-            )
+            node_id = event.get("node_id") or ""
+            status = kind.removeprefix("NODE_")
             shot = event.get("screenshot_base64") or None
-            session.add(
-                NodeResult(
-                    run_id=rid,
-                    node_id=event.get("node_id") or "",
-                    node_type=event.get("node_type") or "",
-                    status=kind.removeprefix("NODE_"),
-                    duration_ms=int(event.get("duration_ms") or 0),
-                    message=(event.get("message") or "")[:2000],
-                    error_message=(event.get("error_stack") or "")[:8000],
-                    output_data=event.get("output_data") or {},
-                    screenshot_base64=shot,
-                    sequence=int(count or 0) + 1,
+            existing = None
+            if status != "RUNNING" and node_id:
+                existing = await session.scalar(
+                    select(NodeResult)
+                    .where(
+                        NodeResult.run_id == rid,
+                        NodeResult.node_id == node_id,
+                        NodeResult.status == "RUNNING",
+                    )
+                    .order_by(NodeResult.sequence.desc())
                 )
-            )
+            if existing is not None:
+                existing.status = status
+                existing.node_type = event.get("node_type") or existing.node_type
+                existing.duration_ms = int(event.get("duration_ms") or 0)
+                existing.message = (event.get("message") or "")[:2000]
+                existing.error_message = (event.get("error_stack") or "")[:8000]
+                existing.output_data = event.get("output_data") or {}
+                if shot:
+                    existing.screenshot_base64 = shot
+            else:
+                count = await session.scalar(
+                    select(func.count()).select_from(NodeResult).where(NodeResult.run_id == rid)
+                )
+                session.add(
+                    NodeResult(
+                        run_id=rid,
+                        node_id=node_id,
+                        node_type=event.get("node_type") or "",
+                        status=status,
+                        duration_ms=int(event.get("duration_ms") or 0),
+                        message=(event.get("message") or "")[:2000],
+                        error_message=(event.get("error_stack") or "")[:8000],
+                        output_data=event.get("output_data") or {},
+                        screenshot_base64=shot,
+                        sequence=int(count or 0) + 1,
+                    )
+                )
             if kind == "NODE_FAILED" and not run.error_message:
                 run.error_message = (event.get("message") or "A step failed")[:4000]
         else:

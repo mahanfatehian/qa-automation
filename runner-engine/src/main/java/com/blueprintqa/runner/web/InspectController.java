@@ -230,7 +230,7 @@ public class InspectController {
     }
 
     private Map<String, Object> shot(WebDriver driver) {
-        Pointer.settle(driver);
+        Pointer.settleForShot(driver);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("currentUrl", driver.getCurrentUrl());
         result.put("title", driver.getTitle());

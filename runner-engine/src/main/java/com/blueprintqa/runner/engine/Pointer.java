@@ -184,6 +184,44 @@ public final class Pointer {
         }
     }
 
+    public static void settleForShot(WebDriver driver) {
+        long start = System.currentTimeMillis();
+        int steady = 0;
+        while (System.currentTimeMillis() - start < 10000L) {
+            if (frameReady(driver)) {
+                steady++;
+                if (steady >= 2) {
+                    return;
+                }
+            } else {
+                steady = 0;
+            }
+            try {
+                Thread.sleep(200L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    /** The middle of the window has real content, not a header sitting over a spinner. */
+    public static boolean frameReady(WebDriver driver) {
+        try {
+            Object value = ((JavascriptExecutor) driver).executeScript("""
+                    const center = document.elementFromPoint(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
+                    if (!center || center === document.body || center === document.documentElement) return false;
+                    const image = center.tagName === 'IMG' ? center : (center.querySelector ? center.querySelector('img') : null);
+                    if (image && image.naturalWidth > 48) return true;
+                    const own = (center.innerText || '').replace(/\\s+/g, ' ').trim();
+                    return own.length >= 12;
+                    """);
+            return Boolean.TRUE.equals(value);
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
     public static void settle(WebDriver driver) {
         try {
             new WebDriverWait(driver, Duration.ofSeconds(4)).until(d -> {
