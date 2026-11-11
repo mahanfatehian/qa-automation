@@ -10,7 +10,7 @@ export const CATALOG: StepDef[] = [
     category: "flow",
     hint: "Opens the browser session every later step uses.",
     pins: [execOut],
-    defaults: { browser: "chrome", headless: true, windowWidth: 1280, windowHeight: 800 },
+    defaults: { browser: "chrome", headless: false, windowWidth: 1280, windowHeight: 800 },
   },
   {
     type: "NAVIGATE",
@@ -284,10 +284,10 @@ export const CLAUSE: Record<string, Clause> = {
 };
 
 export const CLAUSE_COLOR: Record<Clause, string> = {
-  given: "#c9d7b0",
-  when: "#f0e2c8",
-  then: "#e0b15a",
-  flow: "#e7a090",
+  given: "#d7e8f7",
+  when: "#f4f8fc",
+  then: "#f7e2a8",
+  flow: "#f3c1b8",
 };
 
 export const CATALOG_BY_TYPE = Object.fromEntries(CATALOG.map((step) => [step.type, step]));

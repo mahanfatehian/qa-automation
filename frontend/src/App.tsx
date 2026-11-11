@@ -7,7 +7,7 @@ import { NodePalette } from "./components/NodePalette";
 import { InspectModal } from "./components/InspectModal";
 import { ExamplesModal } from "./components/ExamplesModal";
 import { ScheduleModal } from "./components/ScheduleModal";
-import { demoGraph, fixtureActionsGraph, fixtureGraph, starterNodes } from "./demo";
+import { demoGraph, fixtureActionsGraph, fixtureGraph, publicSiteGraph, starterNodes } from "./demo";
 import { api, type PickResult } from "./services/api";
 import { openRunSocket } from "./services/socket";
 import type { BlueprintData, TelemetryEvent, TestRun, Workflow } from "./types/blueprint";
@@ -184,10 +184,10 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#16130f] px-3" data-testid="studio-header">
-        <div>
-          <p className="text-sm font-semibold leading-4 tracking-tight">Blueprint bench</p>
-          <p className="font-mono text-[10px] text-[#8f857a]">wire the steps, then run them</p>
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#082e54] px-3" data-testid="studio-header">
+        <div className="border border-[rgba(244,248,252,0.55)] px-2 py-1">
+          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#d5e6f5]">BQA-01</p>
+          <p className="text-sm font-semibold leading-4">BlueprintQA</p>
         </div>
         <select className="btn max-w-56" value={activeId || ""} onChange={(event) => {
           const next = workflows.find((item) => item.id === event.target.value);
@@ -201,6 +201,7 @@ export function App() {
         <button className="btn" onClick={() => { if (!confirmDirty()) return; createTest().catch((err: Error) => setError(err.message)); }}>New</button>
         <button className="btn" onClick={() => { if (!confirmDirty()) return; const demo = demoGraph(); setNodes(demo.nodes); setEdges(demo.edges); setDirty(true); }}>Load demo</button>
         <button className="btn" onClick={() => { if (!confirmDirty()) return; const fixture = fixtureGraph(); setNodes(fixture.nodes); setEdges(fixture.edges); setDirty(true); }}>Load fixture</button>
+        <button className="btn" onClick={() => { if (!confirmDirty()) return; const page = publicSiteGraph(); setNodes(page.nodes); setEdges(page.edges); setName("Wikipedia Selenium"); setDirty(true); }}>Public site</button>
         <button className="btn" onClick={() => { if (!confirmDirty()) return; const fixture = fixtureActionsGraph(); setNodes(fixture.nodes); setEdges(fixture.edges); setDirty(true); }}>Load actions</button>
         <button className="btn btn-danger" onClick={() => {
           if (!activeId || !window.confirm("Delete this blueprint and its runs?")) return;
@@ -213,7 +214,8 @@ export function App() {
         <button className="btn btn-run" onClick={() => runBlueprint().catch((err: Error) => setError(err.message))}>Run blueprint</button>
         <button className="btn" onClick={() => setExamplesOpen(true)}>Examples{examples.length ? ` (${examples.length})` : ""}</button>
         <button className="btn" onClick={() => setScheduleOpen(true)}>Automatic runs</button>
-        <span className="ml-auto font-mono text-[11px] text-[#8f857a]">{grid}</span>
+        <a className="btn" href="http://localhost:7900/?autoconnect=1&resize=scale" target="_blank" rel="noreferrer">Watch browser</a>
+        <span className="ml-auto font-mono text-[11px] text-[#d5e6f5]">{grid}</span>
         {run && <a className="btn" href={`/api/v1/runs/${run.id}/junit`}>JUnit</a>}
       </header>
       {error && <p className="bg-[#3a241c] px-3 py-1 text-sm text-[#e7a090]">{error}</p>}
@@ -248,7 +250,7 @@ export function App() {
             setPickError("");
             setPickResult(null);
             try {
-              const result = await api.pick({ url, browser: "chrome", headless: true });
+              const result = await api.pick({ url, browser: "chrome", headless: false });
               setPickResult(result);
               if (!result.ok) setPickError(result.error || "Pick failed");
             } catch (err) {

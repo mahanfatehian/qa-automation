@@ -103,7 +103,7 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
         selectNodesOnDrag={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#1e293b" />
+        <Background variant={BackgroundVariant.Lines} gap={28} size={1} color="rgba(244,248,252,0.08)" />
         <Controls />
         <MiniMap pannable zoomable nodeColor={miniColor} />
       </ReactFlow>

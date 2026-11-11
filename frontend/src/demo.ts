@@ -3,10 +3,11 @@ import { CATALOG_BY_TYPE } from "./catalog";
 import type { BlueprintData } from "./types/blueprint";
 
 export const FIXTURE_URL = "http://control-plane:8000/fixtures/lab.html";
+export const PUBLIC_URL = "https://en.wikipedia.org/wiki/Selenium_(software)";
 
 export function fixtureGraph(): { nodes: Node<BlueprintData>[]; edges: Edge[] } {
   const nodes: Node<BlueprintData>[] = [
-    node("start", "START", 40, 180, { browser: "chrome", headless: true, windowWidth: 1280, windowHeight: 800 }),
+    node("start", "START", 40, 180, { browser: "chrome", headless: false, windowWidth: 1280, windowHeight: 800 }),
     node("open", "NAVIGATE", 320, 180, { url: FIXTURE_URL, timeoutSeconds: 20 }),
     node("find", "SEARCH_ELEMENT", 620, 180, { strategy: "CSS", query: "[data-testid='intro']", timeoutSeconds: 10 }),
     node("read", "EXTRACT_CONTENT", 920, 180, { extractType: "INNER_TEXT", saveAsVariable: "intro" }),
@@ -23,9 +24,24 @@ export function fixtureGraph(): { nodes: Node<BlueprintData>[]; edges: Edge[] } 
   return { nodes, edges };
 }
 
+export function publicSiteGraph(): { nodes: Node<BlueprintData>[]; edges: Edge[] } {
+  const nodes: Node<BlueprintData>[] = [
+    node("start", "START", 40, 180, { browser: "chrome", headless: false, windowWidth: 1280, windowHeight: 800 }),
+    node("open", "NAVIGATE", 320, 180, { url: PUBLIC_URL, title: "Open Wikipedia", timeoutSeconds: 30 }),
+    node("check", "VERIFY", 640, 180, { check: "TITLE_CONTAINS", expected: "Selenium" }),
+    node("find", "SEARCH_ELEMENT", 960, 180, { strategy: "CSS", query: "h1#firstHeading", timeoutSeconds: 15 }),
+  ];
+  const edges: Edge[] = [
+    exec("p1", "start", "open"),
+    exec("p2", "open", "check"),
+    exec("p3", "check", "find"),
+  ];
+  return { nodes, edges };
+}
+
 export function fixtureActionsGraph(): { nodes: Node<BlueprintData>[]; edges: Edge[] } {
   const nodes: Node<BlueprintData>[] = [
-    node("start", "START", 40, 200, { browser: "chrome", headless: true, windowWidth: 1280, windowHeight: 800 }),
+    node("start", "START", 40, 200, { browser: "chrome", headless: false, windowWidth: 1280, windowHeight: 800 }),
     node("open", "NAVIGATE", 300, 200, { url: FIXTURE_URL, timeoutSeconds: 20 }),
     node("scroll", "SCROLL", 560, 200, { mode: "ELEMENT", xpath: "//*[@data-testid='lower']", strategy: "XPATH" }),
     node("hover", "HOVER", 820, 80, { xpath: "//*[@id='hover-box']", strategy: "XPATH" }),
@@ -50,7 +66,7 @@ export function starterNodes(): Node<BlueprintData>[] {
         nodeType: "START",
         title: "Start browser",
         browser: "chrome",
-        headless: true,
+        headless: false,
         windowWidth: 1280,
         windowHeight: 800,
       },
@@ -60,7 +76,7 @@ export function starterNodes(): Node<BlueprintData>[] {
 
 export function demoGraph(): { nodes: Node<BlueprintData>[]; edges: Edge[] } {
   const nodes: Node<BlueprintData>[] = [
-    node("start", "START", 40, 220, { browser: "chrome", headless: true, windowWidth: 1280, windowHeight: 800 }),
+    node("start", "START", 40, 220, { browser: "chrome", headless: false, windowWidth: 1280, windowHeight: 800 }),
     node("open", "NAVIGATE", 340, 220, { url: FIXTURE_URL, timeoutSeconds: 20 }),
     node("find", "SEARCH_ELEMENT", 660, 220, {
       strategy: "CSS",
