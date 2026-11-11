@@ -41,6 +41,7 @@ BlueprintQA Software Requirements Specification, version 1.0. This is the requir
 10. [[10 Automation requirements]]
 11. [[11 Feedback requirements]]
 12. [[12 Quality and security]]
+12b. [[Speed and feel]] is the priority constraint. Read it before building [[Element selection engine]].
 13. [[13 Interfaces and data]]
 14. [[14 Out of scope]]
 15. [[15 Final acceptance]]

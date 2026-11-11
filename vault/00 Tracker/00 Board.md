@@ -33,6 +33,8 @@ Recorder stays out of this order until the picker exists. See [[04 Element picke
 
 QA steps are not only procedures. See [[QA node taxonomy]] for assertions, inputs, verify, and search.
 
+[[Speed and feel]] is the priority. [[00 Features before build]] is the feature freeze before more coding. [[Element selection engine]] is specified and not built.
+
 ## Product boundary
 
 - One canvas. Blueprint pins only.

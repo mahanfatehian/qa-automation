@@ -1,6 +1,6 @@
 # Later - element picker
 
-Not built. The blueprint stays the same. This is only a better way to fill the Find element step.
+A typed probe and a click-on-screenshot pick exist. The engine that still has to be built is [[Element selection engine]]: cursor selection on the page as the blueprint left it, plus a parse of what the control is. It must follow [[Speed and feel]].
 
 ## Why
 
