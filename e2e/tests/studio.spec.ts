@@ -41,6 +41,16 @@ test.describe("Blueprint studio as a QA user", () => {
     await page.mouse.move(box.x + 40, box.y - 90, { steps: 6 });
     await page.mouse.up();
     await expect.poll(async () => (await well.boundingBox())?.height || 0).toBeGreaterThan(before + 40);
+    const shot = page.getByTestId("live-shot");
+    const shotBefore = (await shot.boundingBox())?.width || 0;
+    const logRail = page.getByTestId("log-rail");
+    const logBox = await logRail.boundingBox();
+    if (!logBox) throw new Error("missing log bar");
+    await page.mouse.move(logBox.x + 4, logBox.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(logBox.x - 120, logBox.y + 20, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(async () => (await shot.boundingBox())?.width || 0).toBeGreaterThan(shotBefore + 60);
   });
 
   test("runs the fixture blueprint on the grid", async ({ page }) => {

@@ -79,6 +79,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-top: 1px solid #4a3f34;
   position: relative;
 }
+.log-rail {
+  width: 12px;
+  cursor: ew-resize;
+  background: #2a241e;
+  border-left: 1px solid #4a3f34;
+  border-right: 1px solid #4a3f34;
+  position: relative;
+  flex: none;
+}
+.log-rail::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 3px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 99px;
+  background: #e0b15a;
+}
 .well-rail::after {
   content: "";
   position: absolute;
@@ -92,14 +112,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .step-row {
   display: grid;
-  grid-template-columns: 72px minmax(90px, 140px) 52px 1fr;
-  gap: 8px;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 6px 8px;
   width: 100%;
   border-bottom: 1px solid #3d342c;
   padding: 7px 4px;
   text-align: left;
   font-size: 13px;
 }
+.step-row .step-note { grid-column: 2 / -1; }
 .step-row:hover { background: #322b24; }
 .mark { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .canvas-hint {
