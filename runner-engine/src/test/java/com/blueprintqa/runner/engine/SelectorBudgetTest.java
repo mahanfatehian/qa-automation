@@ -7,16 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SelectorBudgetTest {
     @Test
-    void firstSelectorGetsTheWaitAndFallbacksStayShort() {
+    void everySelectorSharesTheDeadline() {
         int[] slices = SelectorBudget.allocate(5, 10);
         assertEquals(5, slices.length);
-        int probed = 0;
-        for (int index = 1; index < slices.length; index++) {
-            assertTrue(slices[index] <= SelectorBudget.PROBE_SECONDS);
-            probed += slices[index];
+        int sum = 0;
+        for (int slice : slices) {
+            assertTrue(slice >= 1);
+            assertTrue(slice < 10);
+            sum += slice;
         }
-        assertTrue(slices[0] > slices[1]);
-        assertEquals(10 - probed, slices[0]);
+        assertEquals(10, sum);
         assertEquals(slices[0], SelectorBudget.leftover(5, 10));
     }
 

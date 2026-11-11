@@ -54,36 +54,27 @@ public final class StepTargets {
             throw new IllegalArgumentException(emptyMessage);
         }
         int timeout = Math.max(2, node.integer("timeoutSeconds", 10));
-        try {
-            return pass(candidates, timeout, context, finder, emptyMessage);
-        } catch (RuntimeException ex) {
-            if (ex instanceof IllegalArgumentException || finder.documentComplete(context.driver())) {
-                throw ex;
-            }
-            Pointer.settle(context.driver());
-            return pass(candidates, timeout, context, finder, emptyMessage);
-        }
+        return pass(candidates, timeout, context, finder, emptyMessage);
     }
 
     private static WebElement pass(List<String[]> candidates, int timeout, ExecutionContext context, ElementFinder finder, String emptyMessage) {
-        int[] budgets = SelectorBudget.allocate(candidates.size(), timeout);
-        for (String[] candidate : candidates) {
-            WebElement ready = finder.hit(context.driver(), candidate[0], candidate[1]);
-            if (ready != null) {
-                return ready;
+        long deadline = System.nanoTime() + timeout * 1_000_000_000L;
+        String[] first = candidates.get(0);
+        while (System.nanoTime() < deadline) {
+            for (String[] candidate : candidates) {
+                WebElement ready = finder.hit(context.driver(), candidate[0], candidate[1]);
+                if (ready != null) {
+                    return ready;
+                }
             }
-        }
-        RuntimeException last = null;
-        for (int index = 0; index < candidates.size(); index++) {
-            String[] candidate = candidates.get(index);
-            int slice = index < budgets.length ? budgets[index] : SelectorBudget.PROBE_SECONDS;
             try {
-                return finder.findOnce(context.driver(), candidate[0], candidate[1], Math.max(1, slice));
-            } catch (RuntimeException ex) {
-                last = ex;
+                Thread.sleep(200L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                break;
             }
         }
-        throw last == null ? new IllegalStateException(emptyMessage) : last;
+        throw new IllegalStateException("Could not find " + first[0] + " `" + first[1] + "` within " + timeout + "s. " + emptyMessage);
     }
 
     private static List<String[]> candidates(GraphNode node, ExecutionContext context) {
