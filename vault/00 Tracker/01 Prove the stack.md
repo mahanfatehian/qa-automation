@@ -36,6 +36,16 @@ The control plane, runner, studio, and compose file are written. None of them ha
 - [ ] If the demo fails because of a product bug, fix it in this epic. If the public site is down, record that and use a local HTML fixture instead.
 - [ ] Confirm `docker compose down` and `up.bat` again still come up without hand edits.
 
+## Boot result 2026-11-11
+
+`docker compose up --build -d --scale chrome-node=2` built and started the stack. Host port 8000 was already taken by another process, so the API was published on 8001. The studio on port 3000 still proxies to the control plane.
+
+- Control plane health: ok
+- Studio proxy health: ok
+- Grid: ready, two Chrome nodes
+- Fixture blueprint against `http://control-plane:8000/fixtures/lab.html`: PASSED
+- Quotes demo: FAILED. Chrome timed out opening `https://quotes.toscrape.com` (`Timed out receiving message from renderer`). The runner recorded the failed step and closed the session.
+
 ## Done when
 
 One command starts the stack, the studio opens, and the demo blueprint finishes with a visible pass or a visible diagnosed fail. The command and the result are written at the bottom of this note.
