@@ -10,6 +10,8 @@ import {
   type Edge,
   type Node,
   type OnConnect,
+  type OnEdgesChange,
+  type OnNodesChange,
 } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { CATALOG, CATALOG_BY_TYPE, pinKind } from "../catalog";
@@ -28,8 +30,8 @@ const stroke: Record<string, string> = {
 type Props = {
   nodes: Node<BlueprintData>[];
   edges: Edge[];
-  onNodesChange: (changes: never) => void;
-  onEdgesChange: (changes: never) => void;
+  onNodesChange: OnNodesChange<Node<BlueprintData>>;
+  onEdgesChange: OnEdgesChange<Edge>;
   setNodes: React.Dispatch<React.SetStateAction<Node<BlueprintData>[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   onSelect: (id: string | null) => void;
@@ -86,8 +88,8 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange as never}
-        onEdgesChange={onEdgesChange as never}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}

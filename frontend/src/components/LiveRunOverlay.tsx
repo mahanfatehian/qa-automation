@@ -4,10 +4,12 @@ type Props = {
   run: TestRun | null;
   events: TelemetryEvent[];
   shot: string;
+  runs: TestRun[];
   onPick: (event: TelemetryEvent) => void;
+  onOpenRun: (run: TestRun) => void;
 };
 
-export function LiveRunOverlay({ run, events, shot, onPick }: Props) {
+export function LiveRunOverlay({ run, events, shot, runs, onPick, onOpenRun }: Props) {
   const steps = events.filter((event) => event.event_type?.startsWith("NODE_"));
   return (
     <section className="panel grid h-52 shrink-0 grid-cols-[280px_1fr_280px] border-t border-line">
@@ -15,6 +17,11 @@ export function LiveRunOverlay({ run, events, shot, onPick }: Props) {
         <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6bb]">
           Run {run ? run.status : "idle"} {run ? `· ${run.trigger}` : ""}
         </p>
+        <div className="mb-2 flex flex-wrap gap-1">
+          {runs.slice(0, 6).map((item) => (
+            <button key={item.id} className="btn px-1 py-0 text-[10px]" onClick={() => onOpenRun(item)}>{item.status}</button>
+          ))}
+        </div>
         {steps.length === 0 && <p className="text-sm text-[#8ea6bb]">Step feedback shows up here: status, duration, text, and the screenshot taken at that pin.</p>}
         {steps.map((event, index) => (
           <button key={`${event.node_id}-${event.event_type}-${index}`} className="mb-1 block w-full rounded px-2 py-1 text-left text-xs hover:bg-[#122033]" onClick={() => onPick(event)}>
@@ -32,6 +39,7 @@ export function LiveRunOverlay({ run, events, shot, onPick }: Props) {
         <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6bb]">Output</p>
         <pre className="whitespace-pre-wrap font-mono text-[11px] text-[#9ad8ff]">{JSON.stringify(steps.at(-1)?.output_data || {}, null, 2)}</pre>
         {run?.error_message && <p className="mt-2 text-[#ff8fa3]">{run.error_message}</p>}
+        {steps.at(-1)?.error_stack && <p className="mt-2 whitespace-pre-wrap text-[#ffb3c1]">{steps.at(-1)?.error_stack}</p>}
       </div>
     </section>
   );

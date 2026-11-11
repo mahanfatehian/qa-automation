@@ -46,4 +46,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  pick: (body: { url: string; browser?: string; headless?: boolean }) =>
+    request<PickResult>("/api/v1/tools/pick", { method: "POST", body: JSON.stringify(body) }),
+};
+
+export type PickResult = {
+  ok: boolean;
+  current_url: string;
+  title: string;
+  screenshot_base64: string;
+  viewport: { width?: number; height?: number };
+  elements: Array<{
+    tag: string;
+    text: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    selectors: Array<{ kind: string; value: string; rank: number }>;
+  }>;
+  error: string | null;
 };

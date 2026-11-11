@@ -1,6 +1,7 @@
 import unittest
 
 from app.demo import demo_graph, starter_graph
+from app.routers.schedules import token_ok
 from app.validation import GraphError, validate_graph
 
 
@@ -32,6 +33,12 @@ class ValidationTests(unittest.TestCase):
         )
         with self.assertRaises(GraphError):
             validate_graph(graph)
+
+
+    def test_webhook_token_length_mismatch_is_rejected(self) -> None:
+        self.assertFalse(token_ok("abcdef", "a"))
+        self.assertFalse(token_ok("abcdef", "abcdeg"))
+        self.assertTrue(token_ok("abcdef", "abcdef"))
 
 
 if __name__ == "__main__":

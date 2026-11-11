@@ -8,6 +8,7 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8000",
       "/health": "http://localhost:8000",
+      "/fixtures": "http://localhost:8000",
       "/docs": "http://localhost:8000",
       "/openapi.json": "http://localhost:8000",
       "/ws": { target: "ws://localhost:8000", ws: true },

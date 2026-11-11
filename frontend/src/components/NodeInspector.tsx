@@ -6,11 +6,12 @@ type Props = {
   node: Node<BlueprintData> | null;
   onChange: (id: string, patch: Record<string, unknown>) => void;
   onProbe: (node: Node<BlueprintData>) => void;
+  onPick: (node: Node<BlueprintData>) => void;
   probing: boolean;
   probeMessage: string;
 };
 
-export function NodeInspector({ node, onChange, onProbe, probing, probeMessage }: Props) {
+export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeMessage }: Props) {
   if (!node) {
     return (
       <aside className="panel w-72 shrink-0 border-l border-line p-4 text-sm text-[#8ea6bb]">
@@ -42,6 +43,9 @@ export function NodeInspector({ node, onChange, onProbe, probing, probeMessage }
           <Text label="URL" value={String(data.url || "")} onChange={(url) => set({ url })} />
           <NumberField label="Timeout seconds" value={Number(data.timeoutSeconds || 20)} onChange={(timeoutSeconds) => set({ timeoutSeconds })} />
         </>
+      )}
+      {["SEARCH_ELEMENT", "CLICK", "TYPE_TEXT", "EXTRACT_CONTENT", "HOVER", "SCROLL", "SELECT_OPTION", "UPLOAD", "ENTER_FRAME"].includes(String(data.nodeType)) && (
+        <button className="btn mb-3 w-full" onClick={() => onPick(node)}>Pick element</button>
       )}
       {data.nodeType === "SEARCH_ELEMENT" && (
         <>
@@ -88,6 +92,33 @@ export function NodeInspector({ node, onChange, onProbe, probing, probeMessage }
           <Text label="Value" value={String(data.value || "")} onChange={(value) => set({ value })} />
         </>
       )}
+      {data.nodeType === "SCROLL" && (
+        <>
+          <Select label="Mode" value={String(data.mode || "PIXELS")} options={["PIXELS", "ELEMENT", "TOP", "BOTTOM"]} onChange={(mode) => set({ mode })} />
+          {data.mode === "PIXELS" || !data.mode ? (
+            <>
+              <Select label="Direction" value={String(data.direction || "down")} options={["down", "up", "left", "right"]} onChange={(direction) => set({ direction })} />
+              <NumberField label="Pixels" value={Number(data.pixels || 600)} onChange={(pixels) => set({ pixels })} />
+            </>
+          ) : null}
+          {data.mode === "ELEMENT" && <Text label="XPath if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />}
+        </>
+      )}
+      {data.nodeType === "SELECT_OPTION" && (
+        <>
+          <Text label="Option" value={String(data.option || "")} onChange={(option) => set({ option })} />
+          <Select label="Match by" value={String(data.by || "TEXT")} options={["TEXT", "VALUE"]} onChange={(by) => set({ by })} />
+        </>
+      )}
+      {data.nodeType === "PRESS_KEY" && <Text label="Key" value={String(data.key || "ENTER")} onChange={(key) => set({ key })} />}
+      {data.nodeType === "SWITCH_TAB" && (
+        <>
+          <NumberField label="Tab index" value={Number(data.index || 0)} onChange={(index) => set({ index })} />
+          <Text label="Or URL contains" value={String(data.urlContains || "")} onChange={(urlContains) => set({ urlContains })} />
+        </>
+      )}
+      {data.nodeType === "ALERT" && <Select label="Action" value={String(data.action || "ACCEPT")} options={["ACCEPT", "DISMISS"]} onChange={(action) => set({ action })} />}
+      {data.nodeType === "UPLOAD" && <Text label="File inside the runner" value={String(data.filePath || "/app/fixtures/sample.txt")} onChange={(filePath) => set({ filePath })} />}
       {data.nodeType === "ASSERT" && (
         <>
           <Select label="Operator" value={String(data.operator || "NOT_EMPTY")} options={["NOT_EMPTY", "EQUALS", "CONTAINS", "MATCHES_REGEX"]} onChange={(operator) => set({ operator })} />

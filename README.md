@@ -66,6 +66,16 @@ vault/           Obsidian notes for this map and later work
 
 Open `vault/` as an Obsidian vault. `vault/07 SRS/` is the software requirements baseline for the final product. `vault/07 SRS/Development sequence.md` is the step order. `vault/00 Tracker/` is the work board. The product on `main` is not that final product yet.
 
+Screenshots stay in the local Postgres volume until `make clean` or `docker compose down -v`.
+
+A running stack can be called from CI:
+
+```yaml
+- run: curl -fsS -X POST "$BLUEPRINT_URL/api/v1/webhooks/trigger/$WORKFLOW_ID?token=$TOKEN&wait=true"
+```
+
+`$BLUEPRINT_URL` is the control plane, for example `http://localhost:8000`. A failed blueprint returns 422 and fails the job. The stack must already be running.
+
 ## Notes before you expose it
 
 Local defaults use password `blueprint` and publish ports on the machine. Do not put this on the public internet until you add auth and change those passwords. Webhook tokens are per blueprint.

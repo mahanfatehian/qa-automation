@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useEdgesState, useNodesState, type Edge, type Node } from "@xyflow/react";
 import { BlueprintCanvas } from "./components/BlueprintCanvas";
 import { LiveRunOverlay } from "./components/LiveRunOverlay";
 import { NodeInspector } from "./components/NodeInspector";
 import { NodePalette } from "./components/NodePalette";
+import { PickerModal } from "./components/PickerModal";
 import { ScheduleModal } from "./components/ScheduleModal";
-import { demoGraph, starterNodes } from "./demo";
-import { api } from "./services/api";
+import { demoGraph, fixtureActionsGraph, fixtureGraph, starterNodes } from "./demo";
+import { api, type PickResult } from "./services/api";
 import { openRunSocket } from "./services/socket";
 import type { BlueprintData, TelemetryEvent, TestRun, Workflow } from "./types/blueprint";
 
@@ -26,6 +27,12 @@ export function App() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [probing, setProbing] = useState(false);
   const [probeMessage, setProbeMessage] = useState("");
+  const [runs, setRuns] = useState<TestRun[]>([]);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickBusy, setPickBusy] = useState(false);
+  const [pickResult, setPickResult] = useState<PickResult | null>(null);
+  const [pickError, setPickError] = useState("");
+  const [pickNodeId, setPickNodeId] = useState<string | null>(null);
 
   const active = workflows.find((item) => item.id === activeId) || null;
   const selected = nodes.find((node) => node.id === selectedId) || null;
@@ -46,6 +53,7 @@ export function App() {
     setRun(null);
     setEvents([]);
     setShot("");
+    api.runs(workflow.id).then(setRuns).catch(() => setRuns([]));
   }
 
   useEffect(() => {
@@ -108,22 +116,56 @@ export function App() {
   }
 
   async function createTest() {
-    const created = await api.createWorkflow({ name: "Untitled test", graph: { nodes: starterNodes(), edges: [], maxSteps: 500 } });
+    const created = await api.createWorkflow({ name: "Untitled test", graph: { nodes: starterNodes() as unknown as Workflow["graph"]["nodes"], edges: [], maxSteps: 500 } });
     setWorkflows((current) => [created, ...current]);
     setActiveId(created.id);
     applyGraph(created);
   }
 
-  const markDirty = useMemo(() => ({
-    onNodesChange: ((changes: unknown) => {
-      setDirty(true);
-      onNodesChange(changes as never);
-    }) as never,
-    onEdgesChange: ((changes: unknown) => {
-      setDirty(true);
-      onEdgesChange(changes as never);
-    }) as never,
-  }), [onEdgesChange, onNodesChange]);
+  function confirmDirty() {
+    if (!dirty) return true;
+    return window.confirm("This blueprint has unsaved edits. Continue and drop them?");
+  }
+
+  async function openPast(item: TestRun) {
+    setRun(item);
+    const results = await api.results(item.id);
+    setEvents(results.map((row) => ({
+      event_type: `NODE_${row.status}`,
+      run_id: item.id,
+      node_id: row.node_id,
+      node_type: row.node_type,
+      duration_ms: row.duration_ms,
+      message: row.message,
+      error_stack: row.error_message,
+      output_data: row.output_data,
+    })));
+    const withShot = [...results].reverse().find((row) => row.has_screenshot);
+    if (withShot) {
+      const response = await fetch(`/api/v1/runs/${item.id}/results/${withShot.id}/screenshot`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = () => setShot(String(reader.result).split(",")[1] || "");
+        reader.readAsDataURL(blob);
+      }
+    }
+  }
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        save().catch((err: Error) => setError(err.message));
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        runBlueprint().catch((err: Error) => setError(err.message));
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   return (
     <div className="flex h-screen flex-col">
@@ -142,8 +184,17 @@ export function App() {
           {workflows.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
         <input className="btn w-48" value={name} onChange={(event) => { setName(event.target.value); setDirty(true); }} />
-        <button className="btn" onClick={() => createTest().catch((err: Error) => setError(err.message))}>New</button>
-        <button className="btn" onClick={() => { const demo = demoGraph(); setNodes(demo.nodes); setEdges(demo.edges); setDirty(true); }}>Load demo</button>
+        <button className="btn" onClick={() => { if (!confirmDirty()) return; createTest().catch((err: Error) => setError(err.message)); }}>New</button>
+        <button className="btn" onClick={() => { if (!confirmDirty()) return; const demo = demoGraph(); setNodes(demo.nodes); setEdges(demo.edges); setDirty(true); }}>Load demo</button>
+        <button className="btn" onClick={() => { if (!confirmDirty()) return; const fixture = fixtureGraph(); setNodes(fixture.nodes); setEdges(fixture.edges); setDirty(true); }}>Load fixture</button>
+        <button className="btn" onClick={() => { if (!confirmDirty()) return; const fixture = fixtureActionsGraph(); setNodes(fixture.nodes); setEdges(fixture.edges); setDirty(true); }}>Load actions</button>
+        <button className="btn btn-danger" onClick={() => {
+          if (!activeId || !window.confirm("Delete this blueprint and its runs?")) return;
+          api.removeWorkflow(activeId).then(() => loadList()).then((rows) => {
+            if (rows && rows[0]) { setActiveId(rows[0].id); applyGraph(rows[0]); }
+            else { setActiveId(null); setNodes([]); setEdges([]); }
+          }).catch((err: Error) => setError(err.message));
+        }}>Delete</button>
         <button className="btn" onClick={() => save().catch((err: Error) => setError(err.message))}>{dirty ? "Save" : "Saved"}</button>
         <button className="btn btn-run" onClick={() => runBlueprint().catch((err: Error) => setError(err.message))}>Run blueprint</button>
         <button className="btn" onClick={() => setScheduleOpen(true)}>Automatic runs</button>
@@ -156,8 +207,8 @@ export function App() {
         <BlueprintCanvas
           nodes={nodes}
           edges={edges}
-          onNodesChange={markDirty.onNodesChange}
-          onEdgesChange={markDirty.onEdgesChange}
+          onNodesChange={(changes) => { setDirty(true); onNodesChange(changes); }}
+          onEdgesChange={(changes) => { setDirty(true); onEdgesChange(changes); }}
           setNodes={(value) => { setDirty(true); setNodes(value); }}
           setEdges={(value) => { setDirty(true); setEdges(value); }}
           onSelect={setSelectedId}
@@ -166,6 +217,30 @@ export function App() {
           node={selected}
           probing={probing}
           probeMessage={probeMessage}
+          onPick={async (node) => {
+            const opener = nodes.find((item) => item.data.nodeType === "NAVIGATE");
+            const url = String(opener?.data.url || "");
+            if (!url) {
+              setPickError("Add an Open page step with a URL first.");
+              setPickOpen(true);
+              setPickResult(null);
+              return;
+            }
+            setPickNodeId(node.id);
+            setPickOpen(true);
+            setPickBusy(true);
+            setPickError("");
+            setPickResult(null);
+            try {
+              const result = await api.pick({ url, browser: "chrome", headless: true });
+              setPickResult(result);
+              if (!result.ok) setPickError(result.error || "Pick failed");
+            } catch (err) {
+              setPickError(err instanceof Error ? err.message : "Pick failed");
+            } finally {
+              setPickBusy(false);
+            }
+          }}
           onChange={(id, patch) => {
             setDirty(true);
             setNodes((current) => current.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node));
@@ -190,8 +265,21 @@ export function App() {
           }}
         />
       </div>
-      <LiveRunOverlay run={run} events={events} shot={shot} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} />
+      <LiveRunOverlay run={run} events={events} shot={shot} runs={runs} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
       <ScheduleModal open={scheduleOpen} workflowId={activeId} webhookToken={active?.webhook_token || ""} onClose={() => setScheduleOpen(false)} />
+      <PickerModal
+        open={pickOpen}
+        busy={pickBusy}
+        result={pickResult}
+        error={pickError}
+        onClose={() => setPickOpen(false)}
+        onChoose={(strategy, query) => {
+          if (!pickNodeId) return;
+          setDirty(true);
+          setNodes((current) => current.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, strategy, query, xpath: query } } : node));
+          setPickOpen(false);
+        }}
+      />
     </div>
   );
 }

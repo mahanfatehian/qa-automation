@@ -64,7 +64,7 @@ export function ScheduleModal({ open, workflowId, webhookToken, onClose }: Props
         <ul className="mb-4 max-h-40 space-y-1 overflow-auto text-sm">
           {rows.map((row) => (
             <li key={row.id} className="flex items-center justify-between rounded border border-line px-2 py-1">
-              <span>{row.enabled ? "on" : "off"} · {row.schedule_type === "CRON" ? row.cron_expression : `${row.interval_seconds}s`}</span>
+              <span>{row.enabled ? "on" : "off"} · {row.schedule_type === "CRON" ? row.cron_expression : `${row.interval_seconds}s`}{row.last_run_at ? ` · last ${row.last_run_at.slice(0, 16)}` : ""}</span>
               <span className="flex gap-2">
                 <button className="btn" onClick={() => api.updateSchedule(row.id, { enabled: !row.enabled }).then((next) => setRows((current) => current.map((item) => item.id === next.id ? next : item)))}>Toggle</button>
                 <button className="btn btn-danger" onClick={() => api.removeSchedule(row.id).then(() => setRows((current) => current.filter((item) => item.id !== row.id)))}>Delete</button>
