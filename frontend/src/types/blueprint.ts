@@ -49,6 +49,7 @@ export type Workflow = {
     edges: Array<Record<string, unknown>>;
     maxSteps?: number;
     variables?: Record<string, unknown>;
+    examples?: Array<Record<string, string>>;
   };
   webhook_token: string;
   created_at: string;

@@ -5,6 +5,9 @@ test.describe("Blueprint studio as a QA user", () => {
   test("opens the blueprint canvas", async ({ page }) => {
     const studio = new StudioPage(page);
     await studio.goto();
+    await expect(page.getByText("Given")).toBeVisible();
+    await expect(page.getByText("When")).toBeVisible();
+    await expect(page.getByText("Then")).toBeVisible();
     await expect(page.getByRole("button", { name: "Find element" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Run blueprint" })).toBeVisible();
     await page.screenshot({ path: "artifacts/studio-open.png", fullPage: true });

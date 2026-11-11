@@ -23,7 +23,7 @@ The node handlers are the step definitions. The canvas is the feature file. A ru
 - No `cucumber-java` dependency.
 - No `.feature` files as the source of truth. The saved blueprint JSON is the scenario.
 - No separate step-definition classes. Adding a QA action means a blueprint step, not an annotation.
-- Scenario Outline tables are not built yet. `{{variable}}` and Repeat cover the simple case. A data table is a later input, not a reason to add Cucumber.
+- Scenario Outline is the Examples button. Each row queues one run and fills `{{column}}`. It is still the same blueprint, not a Cucumber table.
 
 ## How a scenario reads on the canvas
 

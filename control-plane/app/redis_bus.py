@@ -62,21 +62,35 @@ def clean_edge(edge: dict) -> dict:
     }
 
 
-def build_payload(run: TestRun, workflow: Workflow) -> dict:
+def build_payload(run: TestRun, workflow: Workflow, row: dict | None = None, row_index: int | None = None) -> dict:
     graph = workflow.graph or {}
     try:
         max_steps = int(graph.get("maxSteps") or settings.max_steps)
     except (TypeError, ValueError):
         max_steps = settings.max_steps
+    variables = dict(graph.get("variables") or {})
+    if row:
+        variables.update({str(key): value for key, value in row.items()})
+    name = workflow.name
+    if row_index is not None:
+        name = f"{name} [example {row_index + 1}]"
     return {
         "runId": str(run.id),
         "workflowId": str(workflow.id),
-        "workflowName": workflow.name,
+        "workflowName": name,
         "maxSteps": max(1, min(max_steps, 5000)),
         "nodes": [clean_node(node) for node in graph.get("nodes") or []],
         "edges": [clean_edge(edge) for edge in graph.get("edges") or []],
-        "variables": graph.get("variables") or {},
+        "variables": variables,
     }
+
+
+def example_rows(graph: dict) -> list[dict]:
+    raw = graph.get("examples") or []
+    if not isinstance(raw, list):
+        return []
+    rows = [row for row in raw if isinstance(row, dict) and row]
+    return rows[:25]
 
 
 async def enqueue_run(session: AsyncSession, workflow: Workflow, trigger: str) -> TestRun:
@@ -88,19 +102,31 @@ async def enqueue_run(session: AsyncSession, workflow: Workflow, trigger: str) -
         )
         if active:
             raise BusyError("A run for this blueprint is already queued or running")
-    run = TestRun(workflow_id=workflow.id, status="QUEUED", trigger=trigger)
-    session.add(run)
+    rows = example_rows(workflow.graph or {})
+    queued: list[tuple[TestRun, dict | None, int | None]] = []
+    if not rows:
+        run = TestRun(workflow_id=workflow.id, status="QUEUED", trigger=trigger)
+        session.add(run)
+        queued.append((run, None, None))
+    else:
+        for index, row in enumerate(rows):
+            run = TestRun(workflow_id=workflow.id, status="QUEUED", trigger=trigger)
+            session.add(run)
+            queued.append((run, row, index))
     await session.commit()
-    await session.refresh(run)
+    first = queued[0][0]
+    await session.refresh(first)
     try:
-        await get_redis().rpush(settings.queue_name, json.dumps(build_payload(run, workflow)))
+        for run, row, index in queued:
+            await session.refresh(run)
+            await get_redis().rpush(settings.queue_name, json.dumps(build_payload(run, workflow, row, index)))
     except Exception as exc:
-        run.status = "ERROR"
-        run.error_message = f"Could not queue blueprint: {exc}"
-        run.finished_at = utcnow()
+        first.status = "ERROR"
+        first.error_message = f"Could not queue blueprint: {exc}"
+        first.finished_at = utcnow()
         await session.commit()
         raise
-    return run
+    return first
 
 
 def normalize(raw: dict) -> dict:

@@ -5,6 +5,7 @@ import { LiveRunOverlay } from "./components/LiveRunOverlay";
 import { NodeInspector } from "./components/NodeInspector";
 import { NodePalette } from "./components/NodePalette";
 import { PickerModal } from "./components/PickerModal";
+import { ExamplesModal } from "./components/ExamplesModal";
 import { ScheduleModal } from "./components/ScheduleModal";
 import { demoGraph, fixtureActionsGraph, fixtureGraph, starterNodes } from "./demo";
 import { api, type PickResult } from "./services/api";
@@ -25,6 +26,8 @@ export function App() {
   const [shot, setShot] = useState("");
   const [error, setError] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
+  const [examples, setExamples] = useState<Array<Record<string, string>>>([]);
   const [probing, setProbing] = useState(false);
   const [probeMessage, setProbeMessage] = useState("");
   const [runs, setRuns] = useState<TestRun[]>([]);
@@ -51,6 +54,7 @@ export function App() {
       position: node.position ?? { x: 80 + index * 40, y: 120 },
     })));
     setEdges((graph.edges || []) as Edge[]);
+    setExamples(Array.isArray(graph.examples) ? graph.examples : []);
     setSelectedId(null);
     setDirty(false);
     setRun(null);
@@ -84,6 +88,7 @@ export function App() {
           data: { ...node.data, runStatus: undefined },
         })),
         edges,
+        examples,
       },
     };
   }
@@ -200,6 +205,7 @@ export function App() {
         }}>Delete</button>
         <button className="btn" onClick={() => save().catch((err: Error) => setError(err.message))}>{dirty ? "Save" : "Saved"}</button>
         <button className="btn btn-run" onClick={() => runBlueprint().catch((err: Error) => setError(err.message))}>Run blueprint</button>
+        <button className="btn" onClick={() => setExamplesOpen(true)}>Examples{examples.length ? ` (${examples.length})` : ""}</button>
         <button className="btn" onClick={() => setScheduleOpen(true)}>Automatic runs</button>
         <span className="ml-auto font-mono text-[11px] text-[#8ea6bb]">{grid}</span>
         {run && <a className="btn" href={`/api/v1/runs/${run.id}/junit`}>JUnit</a>}
@@ -270,6 +276,7 @@ export function App() {
       </div>
       <LiveRunOverlay run={run} events={events} shot={shot} runs={runs} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
       <ScheduleModal open={scheduleOpen} workflowId={activeId} webhookToken={active?.webhook_token || ""} onClose={() => setScheduleOpen(false)} />
+      <ExamplesModal open={examplesOpen} rows={examples} onClose={() => setExamplesOpen(false)} onChange={(rows) => { setExamples(rows); setDirty(true); }} />
       <PickerModal
         open={pickOpen}
         busy={pickBusy}
