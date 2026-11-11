@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; margin: 0; background: #081018; color: #e8f0f7; }
+body { font-family: "Schibsted Grotesk", "Segoe UI", sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.panel { background: #0d1722; }
+
+.bp-node {
+  width: 230px;
+  border: 1px solid #24384c;
+  border-radius: 8px;
+  background: #101c2b;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+.bp-node.is-selected { border-color: #d5dde6; }
+.bp-node.status-running { box-shadow: 0 0 0 2px #ffe14a, 0 0 22px rgba(255, 225, 74, 0.35); }
+.bp-node.status-passed { box-shadow: 0 0 0 2px #3dff9a; }
+.bp-node.status-failed { box-shadow: 0 0 0 2px #ff4d6a; }
+.bp-head {
+  height: 28px;
+  border-radius: 7px 7px 0 0;
+  padding: 5px 10px;
+  color: #081018;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.bp-pins {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 14px 10px;
+}
+.pin-label {
+  height: 22px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: #b7c6d4;
+}
+.react-flow__handle.handle-exec {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 1px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.react-flow__handle.handle-data {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 999px;
+}
+.react-flow__background { background: #0f172a !important; }
+.react-flow__minimap { background: #0d1722 !important; }
+.react-flow__controls-button { background: #122033 !important; border-bottom-color: #1e3348 !important; fill: #e8f0f7 !important; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; }
+.field input, .field select, .field textarea {
+  border: 1px solid #1e3348;
+  border-radius: 6px;
+  background: #081018;
+  padding: 7px 8px;
+  outline: none;
+}
+.field textarea { min-height: 72px; resize: vertical; }
+.btn {
+  border: 1px solid #1e3348;
+  border-radius: 6px;
+  background: #122033;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.btn:hover { border-color: #49c2ff; }
+.btn-run { background: #14324a; border-color: #49c2ff; color: #9ad8ff; }
+.btn-danger { color: #ff8fa3; }
