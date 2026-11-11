@@ -34,31 +34,52 @@ public class NavigateNodeHandler implements NodeHandler {
         for (int attempt = 1; attempt <= tries; attempt++) {
             try {
                 context.driver().navigate().to(url);
+                last = null;
+                break;
             } catch (Exception ex) {
-                String landed = "";
-                try {
-                    landed = context.driver().getCurrentUrl();
-                } catch (Exception ignored) {
-                    landed = "";
-                }
-                if (landed == null || landed.isBlank() || landed.startsWith("about:") || landed.startsWith("data:")) {
-                    throw ex;
+                last = ex;
+                String landed = readUrl(context);
+                if (isPage(landed)) {
+                    last = null;
+                    break;
                 }
             }
-            last = null;
-            break;
         }
         if (last != null) {
             throw new IllegalStateException("Open page failed for " + url, last);
         }
-        Pointer.settle(context.driver());
-        String current = context.driver().getCurrentUrl();
-        if (current == null || current.isBlank() || current.startsWith("data:") || current.startsWith("about:")) {
+        try {
+            Pointer.settle(context.driver());
+        } catch (RuntimeException ignored) {
+            // a heavy page can stop answering while it paints; the URL check below is the gate
+        }
+        String current = readUrl(context);
+        if (!isPage(current)) {
             throw new IllegalStateException("Open page did not land. The browser is still on a blank page.");
         }
         context.invalidateElements();
         NodeOutput output = NodeOutput.pass(current);
         output.pins.put("text_out", current);
         return output;
+    }
+
+    private static boolean isPage(String url) {
+        return url != null && !url.isBlank() && !url.startsWith("about:") && !url.startsWith("data:");
+    }
+
+    private static String readUrl(ExecutionContext context) {
+        for (int attempt = 0; attempt < 8; attempt++) {
+            try {
+                return context.driver().getCurrentUrl();
+            } catch (RuntimeException ex) {
+                try {
+                    Thread.sleep(400L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return "";
+                }
+            }
+        }
+        return "";
     }
 }
