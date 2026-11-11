@@ -4,8 +4,6 @@ import com.blueprintqa.runner.engine.ExecutionContext;
 import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -36,17 +34,19 @@ public class NavigateNodeHandler implements NodeHandler {
         for (int attempt = 1; attempt <= tries; attempt++) {
             try {
                 context.driver().navigate().to(url);
-                new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(driver ->
-                        "complete".equals(((JavascriptExecutor) driver).executeScript("return document.readyState"))
-                );
-                last = null;
-                break;
             } catch (Exception ex) {
-                last = ex;
-                if (attempt == tries) {
-                    throw new IllegalStateException("Open page failed for " + url + ": " + ex.getMessage(), ex);
+                String landed = "";
+                try {
+                    landed = context.driver().getCurrentUrl();
+                } catch (Exception ignored) {
+                    landed = "";
+                }
+                if (landed == null || landed.isBlank() || landed.startsWith("about:") || landed.startsWith("data:")) {
+                    throw ex;
                 }
             }
+            last = null;
+            break;
         }
         if (last != null) {
             throw new IllegalStateException("Open page failed for " + url, last);
