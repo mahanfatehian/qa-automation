@@ -124,7 +124,7 @@ services:
       selenium-hub:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health"]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/8081"]
       interval: 10s
       timeout: 5s
       retries: 30

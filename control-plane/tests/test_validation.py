@@ -1,7 +1,7 @@
 import unittest
 
 from app.demo import demo_graph, starter_graph
-from app.routers.schedules import token_ok
+from app.tokens import token_ok
 from app.validation import GraphError, validate_graph
 
 

@@ -1,5 +1,4 @@
 import asyncio
-import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,16 +9,14 @@ from app.database import SessionLocal, get_db
 from app.models import TestRun, Workflow, WorkflowSchedule
 from app.redis_bus import enqueue_run
 from app.scheduler import add_job, remove_job, validate_schedule
+from app.tokens import token_ok
 from app.schemas import RunOut, ScheduleCreate, ScheduleOut, ScheduleUpdate
 from app.validation import GraphError, validate_graph
 
 router = APIRouter(tags=["schedules"])
 
 
-def token_ok(expected: str, provided: str) -> bool:
-    if not expected or not provided or len(expected) != len(provided):
-        return False
-    return secrets.compare_digest(expected, provided)
+
 
 
 @router.get("/api/v1/workflows/{workflow_id}/schedules", response_model=list[ScheduleOut])

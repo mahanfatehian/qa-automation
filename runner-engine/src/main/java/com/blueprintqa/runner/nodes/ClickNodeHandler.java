@@ -4,7 +4,6 @@ import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
-import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.ElementNotInteractableException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
@@ -40,7 +39,7 @@ public class ClickNodeHandler implements NodeHandler {
         } else {
             try {
                 element.click();
-            } catch (ElementClickInterceptedException | ElementNotInteractableException ex) {
+            } catch (ElementNotInteractableException ex) {
                 js.executeScript("arguments[0].click();", element);
             }
         }
