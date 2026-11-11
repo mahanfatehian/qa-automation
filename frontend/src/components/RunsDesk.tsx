@@ -4,12 +4,13 @@ import type { NodeResult, TestRun } from "../types/blueprint";
 type Props = {
   runs: TestRun[];
   results: NodeResult[];
+  activeRunId?: string | null;
   onRun: () => void;
   onOpen: (run: TestRun) => void;
   onDelete: (run: TestRun) => void;
 };
 
-export function RunsDesk({ runs, results, onRun, onOpen, onDelete }: Props) {
+export function RunsDesk({ runs, results, activeRunId, onRun, onOpen, onDelete }: Props) {
   return (
     <section className="panel min-h-0 flex-1 overflow-auto p-4" data-testid="runs-desk">
       <div className="mb-4 flex items-center justify-between">
@@ -31,7 +32,7 @@ export function RunsDesk({ runs, results, onRun, onOpen, onDelete }: Props) {
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-t border-line">
+            <tr key={run.id} className={`border-t border-line ${activeRunId === run.id ? "bg-[#2a2a2a]" : ""}`}>
               <td className="py-2">{when(run.created_at)}</td>
               <td>{run.trigger.toLowerCase()}</td>
               <td className={run.status === "PASSED" ? "text-[#7d9a6a]" : run.status === "FAILED" ? "text-[#d46a6a]" : "text-[#7f6df2]"}>{run.status.toLowerCase()}</td>

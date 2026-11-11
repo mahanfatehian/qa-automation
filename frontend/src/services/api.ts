@@ -37,12 +37,13 @@ export const api = {
   run: (id: string) => request<TestRun>(`/api/v1/workflows/${id}/run`, { method: "POST" }),
   rotateWebhook: (id: string) => request<Workflow>(`/api/v1/workflows/${id}/webhook/rotate`, { method: "POST" }),
   schedules: (id: string) => request<Schedule[]>(`/api/v1/workflows/${id}/schedules`),
-  automationLogs: (id: string) => request<Array<{ id: string; level: string; message: string; created_at: string }>>(`/api/v1/workflows/${id}/automation-logs`),
+  automationLogs: (id: string) => request<Array<{ id: string; run_id?: string | null; level: string; message: string; created_at: string }>>(`/api/v1/workflows/${id}/automation-logs`),
   createSchedule: (id: string, body: Partial<Schedule>) =>
     request<Schedule>(`/api/v1/workflows/${id}/schedules`, { method: "POST", body: JSON.stringify(body) }),
   updateSchedule: (id: string, body: Partial<Schedule>) =>
     request<Schedule>(`/api/v1/schedules/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   removeSchedule: (id: string) => request<void>(`/api/v1/schedules/${id}`, { method: "DELETE" }),
+  getRun: (id: string) => request<TestRun>(`/api/v1/runs/${id}`),
   runs: (workflowId: string) => request<TestRun[]>(`/api/v1/runs?workflow_id=${workflowId}`),
   removeRun: (id: string) => request<void>(`/api/v1/runs/${id}`, { method: "DELETE" }),
   results: (runId: string) => request<NodeResult[]>(`/api/v1/runs/${runId}/results`),

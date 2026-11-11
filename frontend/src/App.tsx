@@ -17,6 +17,30 @@ import { api, type PickResult } from "./services/api";
 import { openRunSocket } from "./services/socket";
 import type { BlueprintData, NodeResult, TelemetryEvent, TestRun, Workflow } from "./types/blueprint";
 
+const DESK_PATH: Record<string, string> = {
+  library: "/library",
+  canvas: "/canvas",
+  runs: "/runs",
+  automation: "/automation",
+  data: "/inputs",
+  settings: "/settings",
+};
+
+function deskFromPath(path: string): "library" | "canvas" | "runs" | "automation" | "data" | "settings" {
+  const name = path.replace(/^\/+/, "").split("/")[0];
+  if (name === "inputs" || name === "data") return "data";
+  if (name === "canvas" || name === "runs" || name === "automation" || name === "settings" || name === "library") return name;
+  return "library";
+}
+
+function writeDesk(next: string, blueprintId: string | null, replace = false) {
+  const path = DESK_PATH[next] || "/library";
+  const url = blueprintId ? `${path}?blueprint=${blueprintId}` : path;
+  if (`${window.location.pathname}${window.location.search}` === url) return;
+  if (replace) window.history.replaceState({ desk: next }, "", url);
+  else window.history.pushState({ desk: next }, "", url);
+}
+
 export function App() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -73,7 +97,7 @@ export function App() {
   const [pickError, setPickError] = useState("");
   const [pickNodeId, setPickNodeId] = useState<string | null>(null);
   const [well, setWell] = useState(220);
-  const [desk, setDesk] = useState<"library" | "canvas" | "runs" | "automation" | "data" | "settings">("library");
+  const [desk, setDesk] = useState<"library" | "canvas" | "runs" | "automation" | "data" | "settings">(() => deskFromPath(window.location.pathname));
   const [deskResults, setDeskResults] = useState<NodeResult[]>([]);
 
   const active = workflows.find((item) => item.id === activeId) || null;
@@ -106,10 +130,14 @@ export function App() {
   }
 
   useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("blueprint");
+    const initialDesk = deskFromPath(window.location.pathname);
     loadList().then((rows) => {
-      if (rows[0]) {
-        setActiveId(rows[0].id);
-        applyGraph(rows[0]);
+      const match = rows.find((row) => row.id === wanted) || rows[0];
+      if (match) {
+        setActiveId(match.id);
+        applyGraph(match);
+        writeDesk(initialDesk, match.id, true);
       }
     }).catch((err: Error) => setError(err.message));
     const timer = window.setInterval(() => {
@@ -117,8 +145,33 @@ export function App() {
         setGrid(status.grid.ready ? `${status.grid.node_count} browsers` : "grid down");
       }).catch(() => setGrid("api down"));
     }, 8000);
-    return () => window.clearInterval(timer);
+    const onPop = () => setDesk(deskFromPath(window.location.pathname));
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("popstate", onPop);
+    };
   }, [loadList]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const tick = () => {
+      api.runs(activeId).then((rows) => {
+        setRuns(rows);
+        const live = rows.find((row) => row.status === "QUEUED" || row.status === "RUNNING");
+        if (live) setRun((current) => current && current.id === live.id ? { ...current, status: live.status, error_message: live.error_message } : current);
+      }).catch(() => undefined);
+    };
+    const timer = window.setInterval(tick, 4000);
+    return () => window.clearInterval(timer);
+  }, [activeId]);
+
+  function go(next: "library" | "canvas" | "runs" | "automation" | "data" | "settings") {
+    setDesk(next);
+    writeDesk(next, activeId);
+    if (next === "library") loadList().catch((err: Error) => setError(err.message));
+    if ((next === "runs" || next === "automation") && activeId) api.runs(activeId).then(setRuns).catch(() => undefined);
+  }
 
   function graphBody() {
     return {
@@ -256,6 +309,7 @@ export function App() {
           if (!next) return;
           setActiveId(next.id);
           applyGraph(next);
+          writeDesk(desk, next.id, true);
         }}>
           {workflows.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
@@ -271,12 +325,12 @@ export function App() {
         }}>Delete</button>
         <button className="btn" onClick={() => save().catch((err: Error) => setError(err.message))}>{dirty ? "Save" : "Saved"}</button>
         <button className="btn btn-run" onClick={() => runBlueprint().catch((err: Error) => setError(err.message))}>Run blueprint</button>
-        <button className={`btn ${desk === "data" ? "btn-run" : ""}`} onClick={() => setDesk("data")}>Inputs</button>
-        <button className={`btn ${desk === "library" ? "btn-run" : ""}`} onClick={() => { setDesk("library"); loadList().catch((err: Error) => setError(err.message)); }}>Blueprints</button>
-        <button className={`btn ${desk === "canvas" ? "btn-run" : ""}`} onClick={() => setDesk("canvas")}>Canvas</button>
-        <button className={`btn ${desk === "runs" ? "btn-run" : ""}`} onClick={() => { setDesk("runs"); if (activeId) api.runs(activeId).then(setRuns).catch(() => undefined); }}>Runs</button>
-        <button className={`btn ${desk === "automation" ? "btn-run" : ""}`} onClick={() => setDesk("automation")}>Automation</button>
-        <button className={`btn ${desk === "settings" ? "btn-run" : ""}`} onClick={() => setDesk("settings")}>Settings</button>
+        <button className={`btn ${desk === "data" ? "btn-run" : ""}`} onClick={() => go("data")}>Inputs</button>
+        <button className={`btn ${desk === "library" ? "btn-run" : ""}`} onClick={() => go("library")}>Blueprints</button>
+        <button className={`btn ${desk === "canvas" ? "btn-run" : ""}`} onClick={() => go("canvas")}>Canvas</button>
+        <button className={`btn ${desk === "runs" ? "btn-run" : ""}`} onClick={() => go("runs")}>Runs</button>
+        <button className={`btn ${desk === "automation" ? "btn-run" : ""}`} onClick={() => go("automation")}>Automation</button>
+        <button className={`btn ${desk === "settings" ? "btn-run" : ""}`} onClick={() => go("settings")}>Settings</button>
         <a className="btn" href="http://localhost:7900/?autoconnect=1&resize=scale" target="_blank" rel="noreferrer">Watch browser</a>
         <span className="ml-auto font-mono text-[11px] text-[#999]">{grid}</span>
         {run && <a className="btn" href={`/api/v1/runs/${run.id}/junit`}>JUnit</a>}
@@ -285,8 +339,8 @@ export function App() {
       <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-[280px] min-w-0 flex-1 overflow-hidden">
         {desk === "library" && <WorkflowsDesk workflows={workflows} activeId={activeId} onCreate={() => { if (!confirmDirty()) return; createTest().then(() => setDesk("canvas")).catch((err: Error) => setError(err.message)); }} onOpen={(workflow) => { if (!confirmDirty()) return; setActiveId(workflow.id); applyGraph(workflow); setDesk("canvas"); }} onRun={(workflow) => { setActiveId(workflow.id); applyGraph(workflow); setDesk("canvas"); window.setTimeout(() => runBlueprint().catch((err: Error) => setError(err.message)), 0); }} onDelete={(workflow) => { if (!window.confirm(`Delete ${workflow.name}?`)) return; api.removeWorkflow(workflow.id).then(() => loadList()).then((rows) => { if (workflow.id === activeId) { if (rows && rows[0]) { setActiveId(rows[0].id); applyGraph(rows[0]); } else { setActiveId(null); setNodes([]); setEdges([]); } } }).catch((err: Error) => setError(err.message)); }} onRename={(workflow, next) => { api.saveWorkflow(workflow.id, { name: next }).then((saved) => { setWorkflows((current) => current.map((item) => item.id === saved.id ? saved : item)); if (saved.id === activeId) setName(saved.name); }).catch((err: Error) => setError(err.message)); }} />}
-        {desk === "runs" && <RunsDesk runs={runs} results={deskResults} onRun={() => runBlueprint().catch((err: Error) => setError(err.message))} onOpen={(item) => openPast(item).catch((err: Error) => setError(err.message))} onDelete={(item) => api.removeRun(item.id).then(() => { setRuns((current) => current.filter((run) => run.id !== item.id)); setDeskResults([]); }).catch((err: Error) => setError(err.message))} />}
-        {desk === "automation" && <AutomationDesk workflowId={activeId} workflowName={name} webhookToken={active?.webhook_token || ""} runs={runs} />}
+        {desk === "runs" && <RunsDesk runs={runs} results={deskResults} activeRunId={run?.id} onRun={() => runBlueprint().catch((err: Error) => setError(err.message))} onOpen={(item) => openPast(item).catch((err: Error) => setError(err.message))} onDelete={(item) => api.removeRun(item.id).then(() => { setRuns((current) => current.filter((run) => run.id !== item.id)); setDeskResults([]); }).catch((err: Error) => setError(err.message))} />}
+        {desk === "automation" && <AutomationDesk workflowId={activeId} workflowName={name} webhookToken={active?.webhook_token || ""} runs={runs} activeRunId={run?.id} onOpen={(item) => openPast(item as TestRun).catch((err: Error) => setError(err.message))} />}
         {desk === "data" && <TestDataDesk columns={dataColumns} rows={examples} onChange={(columns, rows) => { setDataColumns(columns); setExamples(rows); setDirty(true); }} />}
         {desk === "settings" && <SettingsDesk />}
         {desk === "canvas" && <NodePalette />}
