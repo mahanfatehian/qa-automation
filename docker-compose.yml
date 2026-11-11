@@ -1,0 +1,146 @@
+name: blueprintqa
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-blueprint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blueprint}
+      POSTGRES_DB: ${POSTGRES_DB:-blueprintqa}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 8s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  selenium-hub:
+    image: selenium/hub:4.52.0-20261101
+    ports:
+      - "${SELENIUM_PUBLISH_PORT:-4442}:4442"
+      - "${SELENIUM_SUBSCRIBE_PORT:-4443}:4443"
+      - "${SELENIUM_PORT:-4444}:4444"
+    environment:
+      SE_SESSION_REQUEST_TIMEOUT: "300"
+      SE_SESSION_RETRY_INTERVAL: "2"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4444/status || exit 1"]
+      interval: 10s
+      timeout: 8s
+      retries: 18
+      start_period: 10s
+    restart: unless-stopped
+
+  chrome-node:
+    image: selenium/node-chrome:4.52.0-20261101
+    platform: linux/amd64
+    shm_size: 2gb
+    depends_on:
+      selenium-hub:
+        condition: service_healthy
+    environment:
+      SE_EVENT_BUS_HOST: selenium-hub
+      SE_EVENT_BUS_PUBLISH_PORT: "4442"
+      SE_EVENT_BUS_SUBSCRIBE_PORT: "4443"
+      SE_NODE_MAX_SESSIONS: ${SE_NODE_MAX_SESSIONS:-2}
+      SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
+      SE_NODE_GRID_URL: http://selenium-hub:4444
+    restart: unless-stopped
+
+  firefox-node:
+    image: selenium/node-firefox:4.52.0-20261101
+    platform: linux/amd64
+    shm_size: 2gb
+    profiles: ["firefox"]
+    depends_on:
+      selenium-hub:
+        condition: service_healthy
+    environment:
+      SE_EVENT_BUS_HOST: selenium-hub
+      SE_EVENT_BUS_PUBLISH_PORT: "4442"
+      SE_EVENT_BUS_SUBSCRIBE_PORT: "4443"
+      SE_NODE_MAX_SESSIONS: ${SE_NODE_MAX_SESSIONS:-2}
+      SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
+      SE_NODE_GRID_URL: http://selenium-hub:4444
+    restart: unless-stopped
+
+  control-plane:
+    build:
+      context: ./control-plane
+    ports:
+      - "${CONTROL_PLANE_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://blueprint:blueprint@postgres:5432/blueprintqa}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RUNNER_URL: ${RUNNER_URL:-http://runner-engine:8081}
+      SELENIUM_GRID_URL: ${SELENIUM_GRID_URL:-http://selenium-hub:4444}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      MAX_STEPS: ${MAX_STEPS:-500}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 8s
+      timeout: 5s
+      retries: 25
+      start_period: 12s
+    restart: unless-stopped
+
+  runner-engine:
+    build:
+      context: ./runner-engine
+    ports:
+      - "${RUNNER_PORT:-8081}:8081"
+    environment:
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: "6379"
+      SELENIUM_GRID_URL: ${SELENIUM_GRID_URL:-http://selenium-hub:4444}
+      SERVER_PORT: "8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+      selenium-hub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
