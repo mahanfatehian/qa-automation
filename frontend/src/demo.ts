@@ -61,14 +61,14 @@ export function starterNodes(): Node<BlueprintData>[] {
 export function demoGraph(): { nodes: Node<BlueprintData>[]; edges: Edge[] } {
   const nodes: Node<BlueprintData>[] = [
     node("start", "START", 40, 220, { browser: "chrome", headless: true, windowWidth: 1280, windowHeight: 800 }),
-    node("open", "NAVIGATE", 340, 220, { url: "https://quotes.toscrape.com", timeoutSeconds: 20 }),
+    node("open", "NAVIGATE", 340, 220, { url: FIXTURE_URL, timeoutSeconds: 20 }),
     node("find", "SEARCH_ELEMENT", 660, 220, {
-      strategy: "XPATH",
-      query: "//div[@class='quote'][1]/span[@class='text']",
+      strategy: "CSS",
+      query: "[data-testid='intro']",
       timeoutSeconds: 12,
     }),
     node("read", "EXTRACT_CONTENT", 980, 220, { extractType: "INNER_TEXT", saveAsVariable: "quoteText" }),
-    node("branch", "IF_CONDITION", 1300, 220, { conditionType: "TEXT_CONTAINS", rightValue: "world" }),
+    node("branch", "IF_CONDITION", 1300, 220, { conditionType: "TEXT_CONTAINS", rightValue: "ready" }),
     node("check", "ASSERT", 1620, 80, { operator: "NOT_EMPTY", expected: "" }),
   ];
   const edges: Edge[] = [

@@ -44,7 +44,8 @@ The control plane, runner, studio, and compose file are written. None of them ha
 - Studio proxy health: ok
 - Grid: ready, two Chrome nodes
 - Fixture blueprint against `http://control-plane:8000/fixtures/lab.html`: PASSED
-- Quotes demo: FAILED. Chrome timed out opening `https://quotes.toscrape.com` (`Timed out receiving message from renderer`). The runner recorded the failed step and closed the session.
+- Quotes demo: the public site did not yield the expected quote node. The seeded demo now uses the local fixture so a new clone does not depend on that site.
+- Later proofs on the running grid: branch true path PASSED, loop over buttons PASSED, two example rows PASSED.
 
 ## Done when
 

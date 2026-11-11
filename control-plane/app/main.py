@@ -39,7 +39,7 @@ async def seed_demo() -> None:
         session.add(
             Workflow(
                 name="Quotes smoke test",
-                description="Opens quotes.toscrape.com, reads the first quote, and checks the text.",
+                description="Opens the local fixture, reads the intro, and checks the text.",
                 graph=demo_graph(),
                 webhook_token=secrets.token_urlsafe(24),
             )

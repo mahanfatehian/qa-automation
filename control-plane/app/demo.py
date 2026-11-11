@@ -43,7 +43,7 @@ def demo_graph() -> dict:
             "data": {
                 "nodeType": "NAVIGATE",
                 "title": "Open page",
-                "url": "https://quotes.toscrape.com",
+                "url": "http://control-plane:8000/fixtures/lab.html",
                 "timeoutSeconds": 20,
             },
         },
@@ -54,8 +54,8 @@ def demo_graph() -> dict:
             "data": {
                 "nodeType": "SEARCH_ELEMENT",
                 "title": "Find element",
-                "strategy": "XPATH",
-                "query": "//div[@class='quote'][1]/span[@class='text']",
+                "strategy": "CSS",
+                "query": "[data-testid='intro']",
                 "timeoutSeconds": 12,
             },
         },
@@ -78,7 +78,7 @@ def demo_graph() -> dict:
                 "nodeType": "IF_CONDITION",
                 "title": "If / else",
                 "conditionType": "TEXT_CONTAINS",
-                "rightValue": "world",
+                "rightValue": "ready",
             },
         },
         {
