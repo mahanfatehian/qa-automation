@@ -14,6 +14,7 @@ The final product is specified. The current branch is not that product.
 - [[00 Board]] is the work board for those steps.
 - [[Map.canvas]] is the same map on a canvas.
 - [[15 Final acceptance]] is what "full ready" means.
+- [[QA node taxonomy]] is the needed consideration: assertions, inputs, verify, and search, not only procedure steps.
 - [[Blueprint not n8n]]
 - [[Direction correction]]
 

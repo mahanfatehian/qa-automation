@@ -49,16 +49,40 @@ public class ElementFinder {
         String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
         int timeout = Math.max(1, timeoutSeconds);
         try {
-            return switch (kind) {
-                case "CSS" -> wait(driver, timeout).until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(query)));
-                case "TEXT_CONTAINS" -> waitJs(driver, timeout, TEXT_SCRIPT, query);
-                case "REGEX_DOM" -> waitJs(driver, timeout, REGEX_SCRIPT, query);
-                case "XPATH" -> wait(driver, timeout).until(ExpectedConditions.presenceOfElementLocated(By.xpath(query)));
-                default -> throw new IllegalArgumentException("Unknown search strategy " + strategy);
-            };
+            By by = by(kind, query);
+            if (by == null) {
+                return switch (kind) {
+                    case "TEXT_CONTAINS" -> waitJs(driver, timeout, TEXT_SCRIPT, query);
+                    case "REGEX_DOM" -> waitJs(driver, timeout, REGEX_SCRIPT, query);
+                    default -> throw new IllegalArgumentException("Unknown search strategy " + strategy);
+                };
+            }
+            return wait(driver, timeout).until(ExpectedConditions.presenceOfElementLocated(by));
         } catch (TimeoutException ex) {
             throw new IllegalStateException("Could not find " + kind + " `" + query + "` within " + timeout + "s", ex);
         }
+    }
+
+    public By by(String strategy, String query) {
+        String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
+        return switch (kind) {
+            case "CSS" -> By.cssSelector(query);
+            case "ID" -> By.id(query);
+            case "NAME" -> By.name(query);
+            case "LINK_TEXT" -> By.linkText(query);
+            case "PARTIAL_LINK_TEXT" -> By.partialLinkText(query);
+            case "TAG" -> By.tagName(query);
+            case "XPATH" -> By.xpath(query);
+            default -> null;
+        };
+    }
+
+    public int count(WebDriver driver, String strategy, String query) {
+        By by = by(strategy, query);
+        if (by == null) {
+            throw new IllegalArgumentException("Count needs a locator strategy, not " + strategy);
+        }
+        return driver.findElements(by).size();
     }
 
     private WebDriverWait wait(WebDriver driver, int timeout) {

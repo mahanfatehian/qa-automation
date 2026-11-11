@@ -49,7 +49,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       )}
       {data.nodeType === "SEARCH_ELEMENT" && (
         <>
-          <Select label="Find by" value={String(data.strategy || "XPATH")} options={["XPATH", "CSS", "TEXT_CONTAINS", "REGEX_DOM"]} onChange={(strategy) => set({ strategy })} />
+          <Select label="Find by" value={String(data.strategy || "XPATH")} options={STRATEGIES} onChange={(strategy) => set({ strategy })} />
           <Area label="Query" value={String(data.query || "")} onChange={(query) => set({ query })} />
           <NumberField label="Timeout seconds" value={Number(data.timeoutSeconds || 10)} onChange={(timeoutSeconds) => set({ timeoutSeconds })} />
           <button className="btn mb-2 w-full" disabled={probing} onClick={() => onProbe(node)}>{probing ? "Probing grid..." : "Probe this selector"}</button>
@@ -119,6 +119,30 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       )}
       {data.nodeType === "ALERT" && <Select label="Action" value={String(data.action || "ACCEPT")} options={["ACCEPT", "DISMISS"]} onChange={(action) => set({ action })} />}
       {data.nodeType === "UPLOAD" && <Text label="File inside the runner" value={String(data.filePath || "/app/fixtures/sample.txt")} onChange={(filePath) => set({ filePath })} />}
+      {data.nodeType === "VERIFY" && (
+        <>
+          <Select label="Check" value={String(data.check || "VISIBLE")} options={["VISIBLE", "ENABLED", "SELECTED", "ATTRIBUTE", "COUNT", "TEXT_CONTAINS", "TEXT_EQUALS", "URL_CONTAINS", "URL_EQUALS", "TITLE_CONTAINS"]} onChange={(check) => set({ check })} />
+          <Select label="Find by" value={String(data.strategy || "XPATH")} options={STRATEGIES} onChange={(strategy) => set({ strategy })} />
+          <Text label="Selector if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />
+          {data.check === "ATTRIBUTE" && <Text label="Attribute" value={String(data.attributeName || "")} onChange={(attributeName) => set({ attributeName })} />}
+          <Text label="Expected" value={String(data.expected || "")} onChange={(expected) => set({ expected })} />
+        </>
+      )}
+      {data.nodeType === "SET_CHECKBOX" && (
+        <>
+          <Check label="Checked" checked={data.checked !== false} onChange={(checked) => set({ checked })} />
+          <Text label="Selector if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />
+        </>
+      )}
+      {data.nodeType === "COOKIE" && (
+        <>
+          <Select label="Action" value={String(data.action || "GET")} options={["GET", "SET", "DELETE", "DELETE_ALL"]} onChange={(action) => set({ action })} />
+          <Text label="Name" value={String(data.cookieName || "")} onChange={(cookieName) => set({ cookieName })} />
+          <Text label="Value" value={String(data.cookieValue || "")} onChange={(cookieValue) => set({ cookieValue })} />
+        </>
+      )}
+      {data.nodeType === "DRAG_DROP" && <Text label="Target selector" value={String(data.targetXpath || "")} onChange={(targetXpath) => set({ targetXpath })} />}
+      {data.nodeType === "SCREENSHOT" && <Text label="Label" value={String(data.label || "")} onChange={(label) => set({ label })} />}
       {data.nodeType === "ASSERT" && (
         <>
           <Select label="Operator" value={String(data.operator || "NOT_EMPTY")} options={["NOT_EMPTY", "EQUALS", "CONTAINS", "MATCHES_REGEX"]} onChange={(operator) => set({ operator })} />
@@ -128,6 +152,8 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
     </aside>
   );
 }
+
+const STRATEGIES = ["XPATH", "CSS", "ID", "NAME", "LINK_TEXT", "PARTIAL_LINK_TEXT", "TAG", "TEXT_CONTAINS", "REGEX_DOM"];
 
 function Text({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <label className="field">{label}<input value={value} onChange={(event) => onChange(event.target.value)} /></label>;

@@ -31,6 +31,8 @@ The app in `main` is a first cut, not the finished product. It has not been boot
 
 Recorder stays out of this order until the picker exists. See [[04 Element picker]].
 
+QA steps are not only procedures. See [[QA node taxonomy]] for assertions, inputs, verify, and search.
+
 ## Product boundary
 
 - One canvas. Blueprint pins only.
