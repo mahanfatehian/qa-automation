@@ -33,7 +33,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       {data.nodeType === "START" && (
         <>
           <Select label="Browser" value={String(data.browser || "chrome")} options={["chrome", "firefox"]} onChange={(browser) => set({ browser })} />
-          <Check label="Hide browser window" checked={data.headless !== false} onChange={(headless) => set({ headless })} />
+          <Check label="Hide browser window" checked={data.headless === true} onChange={(headless) => set({ headless })} />
           <NumberField label="Width" value={Number(data.windowWidth || 1280)} onChange={(windowWidth) => set({ windowWidth })} />
           <NumberField label="Height" value={Number(data.windowHeight || 800)} onChange={(windowHeight) => set({ windowHeight })} />
         </>

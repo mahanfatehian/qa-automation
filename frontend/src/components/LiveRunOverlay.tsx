@@ -41,7 +41,7 @@ export function LiveRunOverlay({ run, events, shot, runs, height, onPick, onOpen
             <span className={tone(event.event_type)}>{word(event.event_type.replace("NODE_", ""))}</span>
             <span>{(event.node_type && CATALOG_BY_TYPE[event.node_type]?.title) || event.node_type || "Step"}</span>
             <span className="text-[#d5e6f5]">{event.duration_ms ? `${event.duration_ms}ms` : ""}</span>
-            <span className="step-note truncate text-[#f4f8fc]">{plain(event.message)}</span>
+            <span className="step-note truncate text-[#f4f8fc]">{stepNote(event)}</span>
           </button>
         ))}
       </div>
@@ -80,6 +80,12 @@ function latestSteps(events: TelemetryEvent[]) {
     if (!prev || rank(event.event_type) >= rank(prev.event_type)) byNode.set(event.node_id, event);
   }
   return [...byNode.values()];
+}
+
+function stepNote(event: TelemetryEvent) {
+  const url = String(event.output_data?.url || "");
+  const selector = String(event.output_data?.selector || "");
+  return [plain(event.message), url, selector].filter(Boolean).join(" · ");
 }
 
 function plain(message?: string | null) {

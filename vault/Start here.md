@@ -16,7 +16,7 @@ The final product is specified. The current branch is not that product.
 - [[15 Final acceptance]] is what "full ready" means.
 - [[00 Features before build]] freezes the features asked for before more coding.
 - [[Speed and feel]] wins when a feature would be slow or nagging.
-- [[Element selection engine]] is the DevTools-style picker. It is specified, not built.
+- [[Element selection engine]] is the DevTools-style picker. It is built.
 - [[Healenium decision]] rejects a healing database as the picker.
 - [[QA node taxonomy]] is the needed consideration: assertions, inputs, verify, and search, not only procedure steps.
 - [[Given When Then]] is that consideration as a scenario. Cucumber is not a dependency.

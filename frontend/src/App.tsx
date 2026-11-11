@@ -148,6 +148,7 @@ export function App() {
       message: row.message,
       error_stack: row.error_message,
       output_data: row.output_data,
+      result_id: row.id,
     })));
     const withShot = [...results].reverse().find((row) => row.has_screenshot);
     if (withShot) {
@@ -295,7 +296,20 @@ export function App() {
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
       }} />
-      <LiveRunOverlay height={well} run={run} events={events} shot={shot} runs={runs} onPick={(event) => { if (event.screenshot_base64) setShot(event.screenshot_base64); }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
+      <LiveRunOverlay height={well} run={run} events={events} shot={shot} runs={runs} onPick={(event) => {
+        if (event.screenshot_base64) {
+          setShot(event.screenshot_base64);
+          return;
+        }
+        if (!run || !event.result_id) return;
+        fetch(`/api/v1/runs/${run.id}/results/${event.result_id}/screenshot`).then(async (response) => {
+          if (!response.ok) return;
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.onload = () => setShot(String(reader.result).split(",")[1] || "");
+          reader.readAsDataURL(blob);
+        }).catch(() => undefined);
+      }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
       </div>
       <ScheduleModal open={scheduleOpen} workflowId={activeId} webhookToken={active?.webhook_token || ""} onClose={() => setScheduleOpen(false)} />
       <ExamplesModal open={examplesOpen} rows={examples} onClose={() => setExamplesOpen(false)} onChange={(rows) => { setExamples(rows); setDirty(true); }} />

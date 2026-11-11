@@ -144,11 +144,11 @@ public class DagExecutorService {
             }
             output = registry.get(node.semanticType()).execute(node, context);
         } catch (Exception ex) {
-            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), friendly(ex), stack(ex), Map.of(), screenshot(context.driver()));
+            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), friendly(ex), stack(ex), stepDetail(node, context, Map.of()), screenshot(context.driver()));
             throw new IllegalStateException(where(context) + friendly(ex), ex);
         }
         store(node, output, context);
-        telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), output.message, "", telemetry.safe(output.pins), screenshot(context.driver()));
+            telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), output.message, "", stepDetail(node, context, output.pins), screenshot(context.driver()));
         String handle = output.nextExec == null || output.nextExec.isBlank() ? "exec_out" : output.nextExec;
         for (GraphNode next : successors(job, node.id, handle)) {
             runNode(next, job, context, steps);
@@ -286,6 +286,27 @@ public class DagExecutorService {
         } catch (Exception ex) {
             return "";
         }
+    }
+
+    private Map<String, Object> stepDetail(GraphNode node, ExecutionContext context, Map<String, Object> extra) {
+        Map<String, Object> detail = new java.util.LinkedHashMap<>();
+        if (extra != null) {
+            detail.putAll(telemetry.safe(extra));
+        }
+        String url = "";
+        try {
+            url = context.driver().getCurrentUrl();
+        } catch (Exception ignored) {
+            url = "";
+        }
+        if (url != null && !url.isBlank()) {
+            detail.put("url", url);
+        }
+        String selector = node.str("query", node.str("xpath", ""));
+        if (!selector.isBlank()) {
+            detail.put("selector", selector);
+        }
+        return detail;
     }
 
     private String where(ExecutionContext context) {

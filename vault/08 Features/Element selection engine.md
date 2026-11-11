@@ -1,12 +1,12 @@
 ---
 type: feature-spec
-status: not-built
+status: built
 priority: high
 ---
 
 # Element selection engine
 
-Specified before implementation. This replaces the idea of "type an XPath and hope." A basic click-on-screenshot pick already exists. This note is the engine that still has to be built.
+Built. Select on page replays the blueprint up to the chosen step, highlights the element under the cursor, and writes a ranked selector from the cached page. BeautifulSoup ranks the path. It does not search the live browser.
 
 Parent: [[00 Features before build]]. Constraint: [[Speed and feel]]. Locator healing is [[Healenium decision]]: not used.
 

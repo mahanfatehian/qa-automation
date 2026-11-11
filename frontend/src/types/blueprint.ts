@@ -37,6 +37,7 @@ export type TelemetryEvent = {
   output_data?: Record<string, unknown>;
   screenshot_base64?: string;
   screenshot_omitted?: boolean;
+  result_id?: string;
   sequence?: number;
 };
 

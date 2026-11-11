@@ -30,7 +30,7 @@ public class ProbeController {
         GraphNode start = new GraphNode();
         start.data = new LinkedHashMap<>();
         start.data.put("browser", text(body.get("browser"), "chrome"));
-        start.data.put("headless", body.get("headless") == null || Boolean.TRUE.equals(body.get("headless")) || "true".equals(String.valueOf(body.get("headless"))));
+        start.data.put("headless", Boolean.TRUE.equals(body.get("headless")) || "true".equalsIgnoreCase(String.valueOf(body.get("headless"))));
         start.data.put("windowWidth", 1280);
         start.data.put("windowHeight", 800);
         WebDriver driver = null;

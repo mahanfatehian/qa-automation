@@ -30,7 +30,7 @@ public class SeleniumFactory {
 
     public WebDriver open(GraphNode start, String sessionName, int attempts) {
         String browser = start == null ? "chrome" : start.str("browser", "chrome");
-        boolean headless = start == null || start.bool("headless", true);
+        boolean headless = start != null && start.bool("headless", false);
         int width = start == null ? 1280 : Math.max(320, start.integer("windowWidth", 1280));
         int height = start == null ? 800 : Math.max(240, start.integer("windowHeight", 800));
         Exception last = null;
