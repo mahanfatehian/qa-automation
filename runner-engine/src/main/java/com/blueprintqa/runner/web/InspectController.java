@@ -25,15 +25,29 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InspectController {
     private static final long TTL_MS = 120_000L;
     private static final String DESCRIBE = """
-            const el = document.elementFromPoint(arguments[0], arguments[1]);
-            if (!el || el.id === 'bqa-hover') return null;
-            let node = el;
+            const x = arguments[0], y = arguments[1];
+            const stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+            let node = null;
+            let bestArea = Infinity;
+            for (const candidate of stack) {
+              if (!candidate || !candidate.tagName) continue;
+              const tag = candidate.tagName;
+              if (tag === 'HTML' || tag === 'BODY') continue;
+              const box = candidate.getBoundingClientRect();
+              const area = box.width * box.height;
+              if (area > 8 && area < bestArea) { node = candidate; bestArea = area; }
+            }
+            if (!node) return null;
             const interesting = (n) => {
               const tag = n.tagName.toLowerCase();
               const type = (n.getAttribute('type') || '').toLowerCase();
               return ['a','button','input','select','textarea','label'].includes(tag) || n.getAttribute('role') === 'button' || type === 'checkbox' || type === 'radio';
             };
-            for (let i = 0; i < 4 && node.parentElement && !interesting(node); i++) node = node.parentElement;
+            for (let i = 0; i < 3 && node.parentElement && !interesting(node); i++) {
+              const parent = node.parentElement;
+              if (!parent.tagName || parent.tagName === 'HTML' || parent.tagName === 'BODY') break;
+              node = parent;
+            }
             const tag = node.tagName.toLowerCase();
             const type = (node.getAttribute('type') || '').toLowerCase();
             let kind = 'text';
