@@ -1,5 +1,7 @@
 # Backlog
 
+This note is a pointer. The requirement list is [[Requirement register]]. The build order is [[Development sequence]]. Do not add final-product work here if it is not in the SRS.
+
 ## Keep
 
 - Blueprint pins and the current step set

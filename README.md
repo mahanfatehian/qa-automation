@@ -64,7 +64,7 @@ runner-engine/   Java 21 virtual threads + Selenium 4.52
 vault/           Obsidian notes for this map and later work
 ```
 
-Open `vault/` as an Obsidian vault. That folder is the product map and the backlog, including the element picker, which is not built yet.
+Open `vault/` as an Obsidian vault. `vault/07 SRS/` is the software requirements baseline for the final product. `vault/07 SRS/Development sequence.md` is the step order. `vault/00 Tracker/` is the work board. The product on `main` is not that final product yet.
 
 ## Notes before you expose it
 

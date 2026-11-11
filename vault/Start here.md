@@ -6,14 +6,15 @@ n8n was only a reference for **automatic runs**: cron, interval, webhook, unatte
 
 ## Read next
 
+The final product is specified. The current branch is not that product.
+
+- [[00 SRS index]] is the requirement baseline.
+- [[Requirement register]] is every requirement and its status.
+- [[Development sequence]] is the only build order.
+- [[00 Board]] is the work board for those steps.
+- [[Map.canvas]] is the same map on a canvas.
+- [[15 Final acceptance]] is what "full ready" means.
 - [[Blueprint not n8n]]
-- [[System map]]
-- [[Pins and steps]]
-- [[Automatic runs]]
-- [[Step feedback]]
-- [[Later - element picker]]
-- [[Later - more browser actions]]
-- [[Backlog]]
 - [[Direction correction]]
 
 ## What exists now

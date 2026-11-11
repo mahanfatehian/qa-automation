@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    {"id": "start", "type": "file", "file": "Start here.md", "x": -720, "y": -80, "width": 360, "height": 280},
+    {"id": "srs", "type": "file", "file": "07 SRS/00 SRS index.md", "x": -240, "y": -280, "width": 420, "height": 360},
+    {"id": "reg", "type": "file", "file": "07 SRS/Requirement register.md", "x": 280, "y": -280, "width": 420, "height": 320},
+    {"id": "seq", "type": "file", "file": "07 SRS/Development sequence.md", "x": -240, "y": 160, "width": 420, "height": 280},
+    {"id": "board", "type": "file", "file": "00 Tracker/00 Board.md", "x": 280, "y": 160, "width": 420, "height": 280},
+    {"id": "accept", "type": "file", "file": "07 SRS/15 Final acceptance.md", "x": 820, "y": -40, "width": 400, "height": 260},
+    {"id": "scope", "type": "file", "file": "07 SRS/14 Out of scope.md", "x": -720, "y": 280, "width": 360, "height": 220}
+  ],
+  "edges": [
+    {"id": "e1", "fromNode": "start", "fromSide": "right", "toNode": "srs", "toSide": "left"},
+    {"id": "e2", "fromNode": "srs", "fromSide": "right", "toNode": "reg", "toSide": "left"},
+    {"id": "e3", "fromNode": "srs", "fromSide": "bottom", "toNode": "seq", "toSide": "top"},
+    {"id": "e4", "fromNode": "seq", "fromSide": "right", "toNode": "board", "toSide": "left"},
+    {"id": "e5", "fromNode": "reg", "fromSide": "bottom", "toNode": "board", "toSide": "top"},
+    {"id": "e6", "fromNode": "board", "fromSide": "right", "toNode": "accept", "toSide": "left"},
+    {"id": "e7", "fromNode": "start", "fromSide": "bottom", "toNode": "scope", "toSide": "top"}
+  ]
+}
