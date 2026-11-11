@@ -110,15 +110,7 @@ public class ElementFinder {
     }
 
     public WebElement find(WebDriver driver, String strategy, String query, int timeoutSeconds) {
-        try {
-            return findOnce(driver, strategy, query, timeoutSeconds);
-        } catch (RuntimeException ex) {
-            if (ex instanceof IllegalArgumentException || documentComplete(driver)) {
-                throw ex;
-            }
-            Pointer.settle(driver);
-            return findOnce(driver, strategy, query, timeoutSeconds);
-        }
+        return findOnce(driver, strategy, query, timeoutSeconds);
     }
 
     public WebElement findOnce(WebDriver driver, String strategy, String query, int timeoutSeconds) {

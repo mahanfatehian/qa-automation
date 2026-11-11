@@ -16,16 +16,13 @@ public final class SelectorBudget {
             slices[0] = timeout;
             return slices;
         }
-        int others = candidates - 1;
-        int probe = PROBE_SECONDS;
-        int maxProbeSpend = Math.max(0, timeout - 1);
-        if (probe * others > maxProbeSpend) {
-            probe = Math.max(0, maxProbeSpend / others);
-        }
-        int spent = probe * others;
-        slices[0] = Math.max(1, timeout - spent);
-        for (int index = 1; index < candidates; index++) {
-            slices[index] = probe;
+        int each = Math.max(1, timeout / candidates);
+        int used = 0;
+        for (int index = 0; index < candidates; index++) {
+            int left = timeout - used;
+            int give = index == candidates - 1 ? left : Math.min(each, left);
+            slices[index] = Math.max(0, give);
+            used += slices[index];
         }
         return slices;
     }
