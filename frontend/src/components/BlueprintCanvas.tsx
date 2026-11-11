@@ -46,14 +46,17 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
   const selectWithLeftDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (target.closest(".react-flow__node, .react-flow__handle, .react-flow__controls, .react-flow__minimap")) return;
+    if (target.closest(".react-flow__node, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .react-flow__panel")) return;
     event.preventDefault();
-    const host = event.currentTarget.getBoundingClientRect();
+    event.stopPropagation();
+    const host = event.currentTarget;
+    const bounds = host.getBoundingClientRect();
+    if (host.setPointerCapture) host.setPointerCapture(event.pointerId);
     const startX = event.clientX;
     const startY = event.clientY;
     const move = (pointer: globalThis.PointerEvent) => {
-      const x = Math.min(startX, pointer.clientX) - host.left;
-      const y = Math.min(startY, pointer.clientY) - host.top;
+      const x = Math.min(startX, pointer.clientX) - bounds.left;
+      const y = Math.min(startY, pointer.clientY) - bounds.top;
       setBox({ x, y, w: Math.abs(pointer.clientX - startX), h: Math.abs(pointer.clientY - startY) });
     };
     const up = (pointer: globalThis.PointerEvent) => {
@@ -127,7 +130,7 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
       data-testid="blueprint-canvas"
       onDragOver={(event) => event.preventDefault()}
       onDrop={onDrop}
-      onPointerDown={selectWithLeftDrag}
+      onPointerDownCapture={selectWithLeftDrag}
       onContextMenu={(event) => {
         event.preventDefault();
         const node = (event.target as HTMLElement).closest(".react-flow__node");
