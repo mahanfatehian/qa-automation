@@ -7,6 +7,7 @@ from app.selector import synthesize
 
 router = APIRouter(prefix="/api/v1/tools", tags=["tools"])
 _html_cache: dict[str, str] = {}
+_runner = httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=2.0), limits=httpx.Limits(max_keepalive_connections=8))
 
 
 @router.post("/inspect/start")
@@ -18,9 +19,8 @@ async def inspect_start(body: InspectStartIn) -> dict:
         "variables": body.variables,
     }
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(f"{settings.runner_url.rstrip('/')}/internal/inspect/start", json=payload)
-            data = response.json()
+        response = await _runner.post(f"{settings.runner_url.rstrip('/')}/internal/inspect/start", json=payload)
+        data = response.json()
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=503, detail=f"Runner is not reachable: {exc}") from exc
     return {
@@ -29,6 +29,7 @@ async def inspect_start(body: InspectStartIn) -> dict:
         "current_url": data.get("currentUrl") or "",
         "title": data.get("title") or "",
         "screenshot_base64": data.get("screenshotBase64") or "",
+        "screenshot_mime": data.get("screenshotMime") or "image/png",
         "viewport": data.get("viewport") or {},
         "error": data.get("error"),
     }
@@ -37,12 +38,12 @@ async def inspect_start(body: InspectStartIn) -> dict:
 @router.post("/inspect/{session_id}/hover")
 async def inspect_hover(session_id: str, body: InspectHoverIn) -> dict:
     try:
-        async with httpx.AsyncClient(timeout=3) as client:
-            response = await client.post(
-                f"{settings.runner_url.rstrip('/')}/internal/inspect/{session_id}/hover",
-                json={"x": body.x, "y": body.y},
-            )
-            data = response.json()
+        response = await _runner.post(
+            f"{settings.runner_url.rstrip('/')}/internal/inspect/{session_id}/hover",
+            json={"x": body.x, "y": body.y},
+            timeout=3,
+        )
+        data = response.json()
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=503, detail=f"Selection lookup failed: {exc}") from exc
     return {"ok": bool(data.get("ok")), "element": data.get("element"), "error": data.get("error")}
@@ -50,11 +51,14 @@ async def inspect_hover(session_id: str, body: InspectHoverIn) -> dict:
 
 @router.post("/inspect/{session_id}/resolve")
 async def inspect_resolve(session_id: str, body: InspectResolveIn) -> dict:
-    html = await _cached_html(session_id, refresh=False)
-    selectors = synthesize(html, body.model_dump())
+    fingerprint = body.model_dump()
+    selectors = synthesize("", fingerprint)
+    if not selectors:
+        html = await _cached_html(session_id, refresh=False)
+        selectors = synthesize(html, fingerprint)
     if not selectors:
         html = await _cached_html(session_id, refresh=True)
-        selectors = synthesize(html, body.model_dump())
+        selectors = synthesize(html, fingerprint)
     return {"ok": bool(selectors), "selectors": selectors}
 
 

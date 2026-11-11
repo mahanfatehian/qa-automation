@@ -6,7 +6,10 @@ _DYNAMIC_ID = re.compile(r"(\d{4,}|^:|ember|react|__|.{25,})", re.I)
 
 
 def synthesize(html: str, fingerprint: dict) -> list[dict]:
-    soup = BeautifulSoup(html or "", "html.parser")
+    quick = _from_fingerprint(fingerprint)
+    if quick and not html:
+        return quick
+    soup = BeautifulSoup(html or "", "lxml" if html else "html.parser")
     node = _locate(soup, fingerprint.get("path") or []) or _locate_attrs(soup, fingerprint)
     if node is None:
         return _from_fingerprint(fingerprint)
@@ -160,22 +163,35 @@ def _unique(soup: BeautifulSoup, selector: str) -> bool:
 
 def _from_fingerprint(fingerprint: dict) -> list[dict]:
     ranked: list[dict] = []
-    tag = str(fingerprint.get("tag") or "*").lower() or "*"
-    testid = str(fingerprint.get("testid") or "")
-    name = str(fingerprint.get("name") or "")
-    aria = str(fingerprint.get("aria") or "")
-    placeholder = str(fingerprint.get("placeholder") or "")
-    element_id = str(fingerprint.get("id") or "")
-    if testid:
-        ranked.append({"kind": "CSS", "value": f'[data-testid="{_q(testid)}"]', "rank": 1})
-    if name:
-        ranked.append({"kind": "CSS", "value": f'{tag}[name="{_q(name)}"]', "rank": 2})
-    if aria:
-        ranked.append({"kind": "CSS", "value": f'{tag}[aria-label="{_q(aria)}"]', "rank": 3})
-    if placeholder:
-        ranked.append({"kind": "CSS", "value": f'{tag}[placeholder="{_q(placeholder)}"]', "rank": 4})
-    if _stable_id(element_id):
-        ranked.append({"kind": "ID", "value": element_id, "rank": 6})
+    seen: set[str] = set()
+
+    def add(kind: str, value: str, rank: int) -> None:
+        key = f"{kind}:{value}"
+        if not value or key in seen:
+            return
+        seen.add(key)
+        ranked.append({"kind": kind, "value": value, "rank": rank})
+
+    sources = []
+    path = fingerprint.get("path") or []
+    if isinstance(path, list):
+        sources.extend(item for item in path if isinstance(item, dict))
+    sources.append(fingerprint)
+    for source in reversed(sources):
+        tag = str(source.get("tag") or fingerprint.get("tag") or "*").lower() or "*"
+        add("CSS", f'[data-testid="{_q(str(source.get("testid") or ""))}"]' if source.get("testid") else "", 1)
+        name = str(source.get("name") or "")
+        if name:
+            add("CSS", f'{tag}[name="{_q(name)}"]', 2)
+        aria = str(source.get("aria") or "")
+        if aria:
+            add("CSS", f'{tag}[aria-label="{_q(aria)}"]', 3)
+        placeholder = str(source.get("placeholder") or "")
+        if placeholder:
+            add("CSS", f'{tag}[placeholder="{_q(placeholder)}"]', 4)
+        element_id = str(source.get("id") or "")
+        if _stable_id(element_id):
+            add("ID", element_id, 6)
     return ranked
 
 

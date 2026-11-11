@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { CATALOG_BY_TYPE, CLAUSE, CLAUSE_COLOR } from "../../catalog";
+import { StepIcon } from "../StepIcon";
 import type { BlueprintData, PinKind } from "../../types/blueprint";
 
 export type FlowNode = Node<BlueprintData, string>;
@@ -12,10 +13,10 @@ const clauseLabel: Record<string, string> = {
 };
 
 const pinColor: Record<PinKind, string> = {
-  exec: "#f4efe6",
-  element: "#c9d7b0",
-  text: "#8eb8c9",
-  bool: "#e0b15a",
+  exec: "#dcddde",
+  element: "#7d9a6a",
+  text: "#7f6df2",
+  bool: "#d4a017",
 };
 
 export function BlueprintNode({ data, selected }: NodeProps<FlowNode>) {
@@ -27,7 +28,8 @@ export function BlueprintNode({ data, selected }: NodeProps<FlowNode>) {
   const clause = CLAUSE[String(data.nodeType || "")] || "when";
   return (
     <div className={`bp-node status-${status} ${selected ? "is-selected" : ""}`} style={{ minHeight: 34 + rows * 22 }}>
-      <div className="bp-head" style={{ background: CLAUSE_COLOR[clause] }}>
+      <div className="bp-head" style={{ borderLeft: `3px solid ${CLAUSE_COLOR[clause]}` }}>
+        <span className="mr-1 inline-flex text-[#dcddde]"><StepIcon type={String(data.nodeType || "")} /></span>
         <span className="mr-1 font-mono text-[9px] uppercase opacity-70">{clauseLabel[clause]}</span>
         {String(data.title || def?.title || data.nodeType)}
       </div>
@@ -48,6 +50,7 @@ export function BlueprintNode({ data, selected }: NodeProps<FlowNode>) {
           type="source"
           position={Position.Right}
           className={pin.kind === "exec" ? "handle-exec" : "handle-data"}
+          title={pin.kind === "exec" ? "Each wire runs on its own browser" : pin.label}
           style={{ top: 40 + index * 22, background: pinColor[pin.kind] }}
         />
       ))}

@@ -29,6 +29,10 @@ public class WaitNodeHandler implements NodeHandler {
         String waitType = node.str("waitType", "FIXED_MS");
         String value = context.interpolate(node.str("value", "1000"));
         int timeout = Math.max(1, node.integer("timeoutSeconds", 15));
+        boolean inspect = Boolean.TRUE.equals(context.variable("__inspect"));
+        if (inspect) {
+            timeout = Math.min(timeout, 3);
+        }
         if ("ELEMENT_VISIBLE".equals(waitType) || "ELEMENT_CLICKABLE".equals(waitType)) {
             String query = context.interpolate(node.str("xpath", value == null ? "" : value));
             var element = finder.find(context.driver(), node.str("strategy", "XPATH"), query, timeout);
@@ -59,7 +63,7 @@ public class WaitNodeHandler implements NodeHandler {
         } catch (NumberFormatException ignored) {
             millis = 1000L;
         }
-        millis = Math.max(0L, Math.min(millis, 120_000L));
+        millis = Math.max(0L, Math.min(millis, Boolean.TRUE.equals(context.variable("__inspect")) ? 200L : 120_000L));
         Thread.sleep(millis);
         return NodeOutput.pass("Waited " + millis + "ms");
     }

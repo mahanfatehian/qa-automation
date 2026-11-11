@@ -64,6 +64,11 @@ services:
       SE_NODE_MAX_SESSIONS: ${SE_NODE_MAX_SESSIONS:-2}
       SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
       SE_NODE_GRID_URL: http://selenium-hub:4444
+      SE_SCREEN_WIDTH: "1920"
+      SE_SCREEN_HEIGHT: "1080"
+      SE_VNC_NO_PASSWORD: "1"
+    ports:
+      - "7900-7903:7900"
     restart: unless-stopped
 
   firefox-node:
@@ -117,6 +122,8 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: "6379"
       SELENIUM_GRID_URL: ${SELENIUM_GRID_URL:-http://selenium-hub:4444}
+      RUNNER_SLOTS: ${RUNNER_SLOTS:-0}
+      RUNNER_QUEUE: ${RUNNER_QUEUE:-64}
       SERVER_PORT: "8081"
     depends_on:
       redis:

@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEdgesState, useNodesState, type Edge, type Node } from "@xyflow/react";
+import { AutomationDesk } from "./components/AutomationDesk";
 import { BlueprintCanvas } from "./components/BlueprintCanvas";
+import { RunsDesk } from "./components/RunsDesk";
+import { SettingsDesk } from "./components/SettingsDesk";
+import { TestDataDesk, type DataColumn } from "./components/TestDataDesk";
+import { WorkflowsDesk } from "./components/WorkflowsDesk";
 import { LiveRunOverlay } from "./components/LiveRunOverlay";
 import { NodeInspector } from "./components/NodeInspector";
 import { NodePalette } from "./components/NodePalette";
 import { InspectModal } from "./components/InspectModal";
 import { ExamplesModal } from "./components/ExamplesModal";
 import { ScheduleModal } from "./components/ScheduleModal";
-import { demoGraph, fixtureActionsGraph, fixtureGraph, publicSiteGraph, starterNodes } from "./demo";
+import { starterNodes } from "./demo";
 import { api, type PickResult } from "./services/api";
 import { openRunSocket } from "./services/socket";
-import type { BlueprintData, TelemetryEvent, TestRun, Workflow } from "./types/blueprint";
+import type { BlueprintData, NodeResult, TelemetryEvent, TestRun, Workflow } from "./types/blueprint";
 
 export function App() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -18,6 +23,36 @@ export function App() {
   const [name, setName] = useState("Untitled test");
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<BlueprintData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const past = useRef<Array<{ nodes: Node<BlueprintData>[]; edges: Edge[] }>>([]);
+  const future = useRef<Array<{ nodes: Node<BlueprintData>[]; edges: Edge[] }>>([]);
+  const graphRef = useRef({ nodes, edges });
+  graphRef.current = { nodes, edges };
+
+  function remember() {
+    past.current.push(JSON.parse(JSON.stringify(graphRef.current)));
+    if (past.current.length > 100) past.current.shift();
+    future.current = [];
+  }
+
+  function restore(next: { nodes: Node<BlueprintData>[]; edges: Edge[] }) {
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    setDirty(true);
+  }
+
+  function undo() {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(JSON.parse(JSON.stringify(graphRef.current)));
+    restore(prev);
+  }
+
+  function redo() {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(JSON.parse(JSON.stringify(graphRef.current)));
+    restore(next);
+  }
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [grid, setGrid] = useState("checking");
@@ -28,6 +63,7 @@ export function App() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [examples, setExamples] = useState<Array<Record<string, string>>>([]);
+  const [dataColumns, setDataColumns] = useState<DataColumn[]>([]);
   const [probing, setProbing] = useState(false);
   const [probeMessage, setProbeMessage] = useState("");
   const [runs, setRuns] = useState<TestRun[]>([]);
@@ -36,7 +72,9 @@ export function App() {
   const [pickResult, setPickResult] = useState<PickResult | null>(null);
   const [pickError, setPickError] = useState("");
   const [pickNodeId, setPickNodeId] = useState<string | null>(null);
-  const [well, setWell] = useState(240);
+  const [well, setWell] = useState(220);
+  const [desk, setDesk] = useState<"library" | "canvas" | "runs" | "automation" | "data" | "settings">("library");
+  const [deskResults, setDeskResults] = useState<NodeResult[]>([]);
 
   const active = workflows.find((item) => item.id === activeId) || null;
   const selected = nodes.find((node) => node.id === selectedId) || null;
@@ -49,6 +87,8 @@ export function App() {
 
   function applyGraph(workflow: Workflow) {
     const graph = workflow.graph || { nodes: [], edges: [] };
+    past.current = [];
+    future.current = [];
     setName(workflow.name);
     setNodes(((graph.nodes || []) as Node<BlueprintData>[]).map((node, index) => ({
       ...node,
@@ -56,6 +96,7 @@ export function App() {
     })));
     setEdges((graph.edges || []) as Edge[]);
     setExamples(Array.isArray(graph.examples) ? graph.examples : []);
+    setDataColumns(Array.isArray(graph.dataColumns) ? graph.dataColumns.map((column) => ({ name: column.name, type: column.type, options: column.options || [] })) : []);
     setSelectedId(null);
     setDirty(false);
     setRun(null);
@@ -90,6 +131,7 @@ export function App() {
         })),
         edges,
         examples,
+        dataColumns,
       },
     };
   }
@@ -107,6 +149,7 @@ export function App() {
     if (dirty) await save();
     const started = await api.run(activeId);
     setRun(started);
+    setRuns((current) => [started, ...current.filter((item) => item.id !== started.id)]);
     setEvents([]);
     setShot("");
     setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, runStatus: "idle" } })));
@@ -118,7 +161,9 @@ export function App() {
         setNodes((current) => current.map((node) => node.id === event.node_id ? { ...node, data: { ...node.data, runStatus: status } } : node));
       }
       if (event.event_type === "RUN_COMPLETED" || event.event_type === "RUN_FAILED" || event.event_type === "RUN_STATUS") {
-        setRun((current) => current ? { ...current, status: event.status || (event.event_type === "RUN_COMPLETED" ? "PASSED" : event.event_type === "RUN_FAILED" ? "FAILED" : current.status), error_message: event.message || current.error_message } : current);
+        const status = event.status || (event.event_type === "RUN_COMPLETED" ? "PASSED" : event.event_type === "RUN_FAILED" ? "FAILED" : started.status);
+        setRun((current) => current ? { ...current, status, error_message: event.message || current.error_message } : current);
+        setRuns((current) => current.map((item) => item.id === started.id ? { ...item, status, error_message: event.message || item.error_message } : item));
       }
     });
     window.setTimeout(() => socket.close(), 15 * 60 * 1000);
@@ -139,6 +184,7 @@ export function App() {
   async function openPast(item: TestRun) {
     setRun(item);
     const results = await api.results(item.id);
+    setDeskResults(results);
     setEvents(results.map((row) => ({
       event_type: `NODE_${row.status}`,
       run_id: item.id,
@@ -172,6 +218,18 @@ export function App() {
         event.preventDefault();
         runBlueprint().catch((err: Error) => setError(err.message));
       }
+      const typing = (event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable='true']");
+      if ((event.ctrlKey || event.metaKey) && !typing && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && !typing && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
         const target = event.target as HTMLElement | null;
         if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
@@ -185,10 +243,13 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#082e54] px-3" data-testid="studio-header">
-        <div className="border border-[rgba(244,248,252,0.55)] px-2 py-1">
-          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#d5e6f5]">BQA-01</p>
-          <p className="text-sm font-semibold leading-4">BlueprintQA</p>
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-[#161616] px-3" data-testid="studio-header">
+        <div className="flex items-center gap-2">
+          <img src="/favicon.svg" alt="" width={28} height={28} />
+          <div>
+            <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#999]">BQA-01</p>
+            <p className="text-sm font-semibold leading-4">BlueprintQA</p>
+          </div>
         </div>
         <select className="btn max-w-56" value={activeId || ""} onChange={(event) => {
           const next = workflows.find((item) => item.id === event.target.value);
@@ -200,10 +261,7 @@ export function App() {
         </select>
         <input className="btn w-48" value={name} onChange={(event) => { setName(event.target.value); setDirty(true); }} />
         <button className="btn" onClick={() => { if (!confirmDirty()) return; createTest().catch((err: Error) => setError(err.message)); }}>New</button>
-        <button className="btn" onClick={() => { if (!confirmDirty()) return; const demo = demoGraph(); setNodes(demo.nodes); setEdges(demo.edges); setDirty(true); }}>Load demo</button>
-        <button className="btn" onClick={() => { if (!confirmDirty()) return; const fixture = fixtureGraph(); setNodes(fixture.nodes); setEdges(fixture.edges); setDirty(true); }}>Load fixture</button>
-        <button className="btn" onClick={() => { if (!confirmDirty()) return; const page = publicSiteGraph(); setNodes(page.nodes); setEdges(page.edges); setName("Wikipedia Selenium"); setDirty(true); }}>Public site</button>
-        <button className="btn" onClick={() => { if (!confirmDirty()) return; const fixture = fixtureActionsGraph(); setNodes(fixture.nodes); setEdges(fixture.edges); setDirty(true); }}>Load actions</button>
+
         <button className="btn btn-danger" onClick={() => {
           if (!activeId || !window.confirm("Delete this blueprint and its runs?")) return;
           api.removeWorkflow(activeId).then(() => loadList()).then((rows) => {
@@ -213,27 +271,47 @@ export function App() {
         }}>Delete</button>
         <button className="btn" onClick={() => save().catch((err: Error) => setError(err.message))}>{dirty ? "Save" : "Saved"}</button>
         <button className="btn btn-run" onClick={() => runBlueprint().catch((err: Error) => setError(err.message))}>Run blueprint</button>
-        <button className="btn" onClick={() => setExamplesOpen(true)}>Examples{examples.length ? ` (${examples.length})` : ""}</button>
-        <button className="btn" onClick={() => setScheduleOpen(true)}>Automatic runs</button>
+        <button className={`btn ${desk === "data" ? "btn-run" : ""}`} onClick={() => setDesk("data")}>Inputs</button>
+        <button className={`btn ${desk === "library" ? "btn-run" : ""}`} onClick={() => { setDesk("library"); loadList().catch((err: Error) => setError(err.message)); }}>Blueprints</button>
+        <button className={`btn ${desk === "canvas" ? "btn-run" : ""}`} onClick={() => setDesk("canvas")}>Canvas</button>
+        <button className={`btn ${desk === "runs" ? "btn-run" : ""}`} onClick={() => { setDesk("runs"); if (activeId) api.runs(activeId).then(setRuns).catch(() => undefined); }}>Runs</button>
+        <button className={`btn ${desk === "automation" ? "btn-run" : ""}`} onClick={() => setDesk("automation")}>Automation</button>
+        <button className={`btn ${desk === "settings" ? "btn-run" : ""}`} onClick={() => setDesk("settings")}>Settings</button>
         <a className="btn" href="http://localhost:7900/?autoconnect=1&resize=scale" target="_blank" rel="noreferrer">Watch browser</a>
-        <span className="ml-auto font-mono text-[11px] text-[#d5e6f5]">{grid}</span>
+        <span className="ml-auto font-mono text-[11px] text-[#999]">{grid}</span>
         {run && <a className="btn" href={`/api/v1/runs/${run.id}/junit`}>JUnit</a>}
       </header>
       {error && <p className="bg-[#3a241c] px-3 py-1 text-sm text-[#e7a090]">{error}</p>}
       <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1">
-        <NodePalette />
-        <BlueprintCanvas
+      <div className="flex min-h-[280px] min-w-0 flex-1 overflow-hidden">
+        {desk === "library" && <WorkflowsDesk workflows={workflows} activeId={activeId} onCreate={() => { if (!confirmDirty()) return; createTest().then(() => setDesk("canvas")).catch((err: Error) => setError(err.message)); }} onOpen={(workflow) => { if (!confirmDirty()) return; setActiveId(workflow.id); applyGraph(workflow); setDesk("canvas"); }} onRun={(workflow) => { setActiveId(workflow.id); applyGraph(workflow); setDesk("canvas"); window.setTimeout(() => runBlueprint().catch((err: Error) => setError(err.message)), 0); }} onDelete={(workflow) => { if (!window.confirm(`Delete ${workflow.name}?`)) return; api.removeWorkflow(workflow.id).then(() => loadList()).then((rows) => { if (workflow.id === activeId) { if (rows && rows[0]) { setActiveId(rows[0].id); applyGraph(rows[0]); } else { setActiveId(null); setNodes([]); setEdges([]); } } }).catch((err: Error) => setError(err.message)); }} onRename={(workflow, next) => { api.saveWorkflow(workflow.id, { name: next }).then((saved) => { setWorkflows((current) => current.map((item) => item.id === saved.id ? saved : item)); if (saved.id === activeId) setName(saved.name); }).catch((err: Error) => setError(err.message)); }} />}
+        {desk === "runs" && <RunsDesk runs={runs} results={deskResults} onRun={() => runBlueprint().catch((err: Error) => setError(err.message))} onOpen={(item) => openPast(item).catch((err: Error) => setError(err.message))} onDelete={(item) => api.removeRun(item.id).then(() => { setRuns((current) => current.filter((run) => run.id !== item.id)); setDeskResults([]); }).catch((err: Error) => setError(err.message))} />}
+        {desk === "automation" && <AutomationDesk workflowId={activeId} workflowName={name} webhookToken={active?.webhook_token || ""} runs={runs} />}
+        {desk === "data" && <TestDataDesk columns={dataColumns} rows={examples} onChange={(columns, rows) => { setDataColumns(columns); setExamples(rows); setDirty(true); }} />}
+        {desk === "settings" && <SettingsDesk />}
+        {desk === "canvas" && <NodePalette />}
+        {desk === "canvas" && <BlueprintCanvas
           nodes={nodes}
           edges={edges}
-          onNodesChange={(changes) => { setDirty(true); onNodesChange(changes); }}
-          onEdgesChange={(changes) => { setDirty(true); onEdgesChange(changes); }}
-          setNodes={(value) => { setDirty(true); setNodes(value); }}
-          setEdges={(value) => { setDirty(true); setEdges(value); }}
+          onNodesChange={(changes) => {
+            if (changes.some((change) => change.type === "remove" || change.type === "add" || change.type === "replace")) remember();
+            if (changes.some((change) => change.type !== "select" && change.type !== "dimensions")) setDirty(true);
+            onNodesChange(changes);
+          }}
+          onEdgesChange={(changes) => {
+            if (changes.some((change) => change.type !== "select")) remember();
+            setDirty(true);
+            onEdgesChange(changes);
+          }}
+          onGestureStart={remember}
+          setNodes={(value) => { remember(); setDirty(true); setNodes(value); }}
+          setEdges={(value) => { remember(); setDirty(true); setEdges(value); }}
           onSelect={setSelectedId}
-        />
-        <NodeInspector
+        />}
+        {desk === "canvas" && <NodeInspector
           node={selected}
+          dataColumns={dataColumns}
+          rows={examples}
           probing={probing}
           probeMessage={probeMessage}
           onPick={async (node) => {
@@ -261,6 +339,7 @@ export function App() {
             }
           }}
           onChange={(id, patch) => {
+            remember();
             setDirty(true);
             setNodes((current) => current.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node));
           }}
@@ -282,13 +361,13 @@ export function App() {
               setProbing(false);
             }
           }}
-        />
+        />}
       </div>
       <div className="well-rail" data-testid="well-rail" onPointerDown={(event) => {
         event.preventDefault();
         const startY = event.clientY;
         const start = well;
-        const move = (pointer: PointerEvent) => setWell(Math.min(window.innerHeight - 180, Math.max(140, start - (pointer.clientY - startY))));
+        const move = (pointer: PointerEvent) => setWell(Math.min(Math.round(window.innerHeight * 0.38), Math.max(160, start - (pointer.clientY - startY))));
         const up = () => {
           window.removeEventListener("pointermove", move);
           window.removeEventListener("pointerup", up);
@@ -312,7 +391,7 @@ export function App() {
       }} onOpenRun={(item) => openPast(item).catch((err: Error) => setError(err.message))} />
       </div>
       <ScheduleModal open={scheduleOpen} workflowId={activeId} webhookToken={active?.webhook_token || ""} onClose={() => setScheduleOpen(false)} />
-      <ExamplesModal open={examplesOpen} rows={examples} onClose={() => setExamplesOpen(false)} onChange={(rows) => { setExamples(rows); setDirty(true); }} />
+
       <InspectModal
         open={pickOpen}
         nodes={nodes}
@@ -327,9 +406,11 @@ export function App() {
           if (!current) return;
           const holdsSelector = ["SEARCH_ELEMENT", "CLICK", "TYPE_TEXT", "EXTRACT_CONTENT", "HOVER", "SCROLL", "SELECT_OPTION", "UPLOAD", "ENTER_FRAME", "VERIFY", "SET_CHECKBOX", "DOUBLE_CLICK", "RIGHT_CLICK"].includes(String(current.data.nodeType));
           if (current.data.nodeType === stepType) {
+            remember();
             setNodes((items) => items.map((node) => node.id === pickNodeId ? { ...node, data: { ...node.data, ...picked } } : node));
           } else {
             const id = `n_${crypto.randomUUID().slice(0, 8)}`;
+            remember();
             setNodes((items) => items.map((node) => node.id === pickNodeId && holdsSelector ? { ...node, data: { ...node.data, ...picked } } : node).concat({
               id,
               type: stepType,

@@ -7,10 +7,12 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 
 @Component
 public class RedisJobConsumer implements ApplicationRunner {
@@ -18,11 +20,13 @@ public class RedisJobConsumer implements ApplicationRunner {
     private final StringRedisTemplate redis;
     private final RedisConfig redisConfig;
     private final DagExecutorService executor;
+    private final Semaphore waiting;
 
-    public RedisJobConsumer(StringRedisTemplate redis, RedisConfig redisConfig, DagExecutorService executor) {
+    public RedisJobConsumer(StringRedisTemplate redis, RedisConfig redisConfig, DagExecutorService executor, @Value("${blueprintqa.runner-queue:64}") int queueDepth) {
         this.redis = redis;
         this.redisConfig = redisConfig;
         this.executor = executor;
+        this.waiting = new Semaphore(Math.max(1, queueDepth));
     }
 
     @Override
@@ -33,8 +37,15 @@ public class RedisJobConsumer implements ApplicationRunner {
                 try {
                     String payload = pop();
                     if (payload != null) {
+                        waiting.acquire();
                         String job = payload;
-                        Thread.ofVirtual().name("blueprint-run").start(() -> executor.executeJob(job));
+                        Thread.ofVirtual().name("blueprint-run").start(() -> {
+                            try {
+                                executor.executeJob(job);
+                            } finally {
+                                waiting.release();
+                            }
+                        });
                     }
                 } catch (Exception ex) {
                     log.error("queue read failed", ex);

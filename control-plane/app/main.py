@@ -21,7 +21,7 @@ from app.models import NodeResult, TestRun, Workflow
 from app.redis_bus import close as close_redis
 from app.redis_bus import connect as connect_redis
 from app.redis_bus import get_redis, listen, public_event
-from app.routers import runs, schedules, tools, workflows
+from app.routers import runs, schedules, settings as studio_settings, tools, workflows
 from app.scheduler import shutdown as shutdown_scheduler
 from app.scheduler import start as start_scheduler
 from app.validation import GraphError
@@ -76,6 +76,7 @@ app.include_router(workflows.router)
 app.include_router(schedules.router)
 app.include_router(runs.router)
 app.include_router(tools.router)
+app.include_router(studio_settings.router)
 fixtures = Path(__file__).resolve().parents[1] / "fixtures"
 if fixtures.is_dir():
     app.mount("/fixtures", StaticFiles(directory=fixtures), name="fixtures")

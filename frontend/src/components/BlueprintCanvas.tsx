@@ -21,10 +21,10 @@ import { BlueprintNode } from "./nodes/BlueprintNode";
 const nodeTypes = Object.fromEntries(CATALOG.map((step) => [step.type, BlueprintNode]));
 
 const stroke: Record<string, string> = {
-  exec: "#f4efe6",
-  element: "#c9d7b0",
-  text: "#8eb8c9",
-  bool: "#e0b15a",
+  exec: "#dcddde",
+  element: "#7d9a6a",
+  text: "#7f6df2",
+  bool: "#d4a017",
 };
 
 type Props = {
@@ -35,14 +35,16 @@ type Props = {
   setNodes: React.Dispatch<React.SetStateAction<Node<BlueprintData>[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   onSelect: (id: string | null) => void;
+  onGestureStart: () => void;
 };
 
-export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onSelect }: Props) {
-  const { screenToFlowPosition } = useReactFlow();
+export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onSelect, onGestureStart }: Props) {
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; nodeId: string | null } | null>(null);
 
-  const selectWithRightDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 2) return;
+  const selectWithLeftDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest(".react-flow__node, .react-flow__handle, .react-flow__controls, .react-flow__minimap")) return;
     event.preventDefault();
@@ -120,7 +122,21 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
   }, []);
 
   return (
-    <div className="relative min-w-0 flex-1" data-testid="blueprint-canvas" onDragOver={(event) => event.preventDefault()} onDrop={onDrop} onPointerDown={selectWithRightDrag} onContextMenu={(event) => event.preventDefault()}>
+    <div
+      className="relative min-w-0 flex-1"
+      data-testid="blueprint-canvas"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={onDrop}
+      onPointerDown={selectWithLeftDrag}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        const node = (event.target as HTMLElement).closest(".react-flow__node");
+        const host = event.currentTarget.getBoundingClientRect();
+        const nodeId = node?.getAttribute("data-id") || null;
+        if (nodeId) onSelect(nodeId);
+        setMenu({ x: event.clientX - host.left, y: event.clientY - host.top, nodeId });
+      }}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -129,8 +145,9 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
         onConnect={onConnect}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
+        onNodeDragStart={onGestureStart}
         onSelectionChange={({ nodes: selected }) => onSelect(selected[0]?.id ?? null)}
-        fitView
+        onInit={(instance) => instance.fitView({ padding: 0.2 })}
         deleteKeyCode={["Backspace", "Delete"]}
         selectionOnDrag={false}
         panOnDrag={[1]}
@@ -140,12 +157,37 @@ export function BlueprintCanvas({ nodes, edges, onNodesChange, onEdgesChange, se
         selectNodesOnDrag={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Lines} gap={28} size={1} color="rgba(244,248,252,0.08)" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#333" />
         <Controls />
         <MiniMap pannable zoomable nodeColor={miniColor} />
       </ReactFlow>
-      <p className="canvas-hint">Right-drag selects · scroll-wheel button pans · wheel zooms · Ctrl+A selects all</p>
-      {box && <div className="pointer-events-none absolute z-10 border border-[#f4f8fc] bg-[rgba(244,248,252,0.12)]" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
+      {menu && (
+        <div className="absolute z-20 min-w-40 border border-[#3f3f3f] bg-[#1e1e1e] py-1 text-sm shadow-lg" style={{ left: menu.x, top: menu.y }} onMouseLeave={() => setMenu(null)}>
+          {menu.nodeId ? (
+            <>
+              <button className="block w-full px-3 py-1 text-left hover:bg-[#2a2a2a]" onClick={() => { onSelect(menu.nodeId); setMenu(null); }}>Properties</button>
+              <button className="block w-full px-3 py-1 text-left hover:bg-[#2a2a2a]" onClick={() => {
+                const source = nodes.find((node) => node.id === menu.nodeId);
+                if (!source) return;
+                const id = `n_${crypto.randomUUID().slice(0, 8)}`;
+                setNodes((current) => current.concat({ ...source, id, selected: true, position: { x: source.position.x + 40, y: source.position.y + 40 } }));
+                setMenu(null);
+              }}>Duplicate</button>
+              <button className="block w-full px-3 py-1 text-left text-[#d46a6a] hover:bg-[#2a2a2a]" onClick={() => {
+                setNodes((current) => current.filter((node) => node.id !== menu.nodeId));
+                setEdges((current) => current.filter((edge) => edge.source !== menu.nodeId && edge.target !== menu.nodeId));
+                setMenu(null);
+              }}>Delete</button>
+            </>
+          ) : (
+            <>
+              <button className="block w-full px-3 py-1 text-left hover:bg-[#2a2a2a]" onClick={() => { setNodes((current) => current.map((node) => ({ ...node, selected: true }))); setMenu(null); }}>Select all</button>
+              <button className="block w-full px-3 py-1 text-left hover:bg-[#2a2a2a]" onClick={() => { fitView({ padding: 0.2 }); setMenu(null); }}>Fit view</button>
+            </>
+          )}
+        </div>
+      )}
+      {box && <div className="pointer-events-none absolute z-10 border border-[#7f6df2] bg-[rgba(127,109,242,0.12)]" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
     </div>
   );
 }

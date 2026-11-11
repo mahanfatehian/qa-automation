@@ -8,7 +8,7 @@ from croniter import croniter
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.models import Workflow, WorkflowSchedule, utcnow
+from app.models import ScheduleLog, Workflow, WorkflowSchedule, utcnow
 from app.redis_bus import BusyError, enqueue_run
 
 logger = logging.getLogger(__name__)
@@ -62,11 +62,26 @@ async def fire_schedule(workflow_id: str, schedule_id: str) -> None:
         if workflow is None or row is None or not row.enabled:
             return
         try:
-            await enqueue_run(session, workflow, row.schedule_type)
+            run = await enqueue_run(session, workflow, row.schedule_type)
         except BusyError:
-            logger.info("skipped overlapping schedule %s", schedule_id)
+            session.add(ScheduleLog(
+                workflow_id=workflow.id,
+                schedule_id=row.id,
+                level="warn",
+                message=f"Skipped {row.name}: a run is already queued or running.",
+                detail={"schedule": row.name, "reason": "already_running"},
+            ))
+            await session.commit()
             return
         row.last_run_at = utcnow()
+        session.add(ScheduleLog(
+            workflow_id=workflow.id,
+            schedule_id=row.id,
+            run_id=run.id,
+            level="info",
+            message=f"{workflow.name} · {row.name} queued {getattr(run, 'variation_label', None) or '1 run'}.",
+            detail={"schedule": row.name, "run_id": str(run.id), "trigger": row.schedule_type},
+        ))
         await session.commit()
 
 

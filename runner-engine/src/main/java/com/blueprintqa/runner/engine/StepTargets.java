@@ -15,10 +15,37 @@ public final class StepTargets {
 
     public static WebElement require(GraphNode node, ExecutionContext context, ElementFinder finder) {
         WebElement element = context.elementInput();
-        if (element != null) {
+        if (usable(element)) {
             return element;
         }
+        ElementRef ref = context.elementRef();
+        if (ref != null && (!ref.query.isBlank() || !ref.selectors.isEmpty())) {
+            return findRef(ref, context, finder);
+        }
         return find(node, context, finder, "This step needs an element pin or a selector. Use Select on page.");
+    }
+
+    private static WebElement findRef(ElementRef ref, ExecutionContext context, ElementFinder finder) {
+        GraphNode synthetic = new GraphNode();
+        synthetic.data = new java.util.HashMap<>();
+        synthetic.data.put("strategy", ref.strategy);
+        synthetic.data.put("query", ref.query);
+        synthetic.data.put("xpath", ref.query);
+        synthetic.data.put("selectors", ref.selectors);
+        synthetic.data.put("timeoutSeconds", 10);
+        return find(synthetic, context, finder, "The element pin could not be found again in this browser.");
+    }
+
+    private static boolean usable(WebElement element) {
+        if (element == null) {
+            return false;
+        }
+        try {
+            element.isEnabled();
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     public static WebElement find(GraphNode node, ExecutionContext context, ElementFinder finder, String emptyMessage) {

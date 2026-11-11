@@ -48,6 +48,18 @@ KNOWN_TYPES = {
     "COOKIE",
     "SCREENSHOT",
     "DRAG_DROP",
+    "OPEN_TAB",
+    "CLOSE_TAB",
+    "FOCUS",
+    "CLEAR_FIELD",
+    "READ_URL",
+    "READ_TITLE",
+    "SET_WINDOW",
+    "MAXIMIZE",
+    "COUNT_ELEMENTS",
+    "WAIT_GONE",
+    "PAGE_STORAGE",
+    "SUBMIT",
 }
 
 

@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
@@ -23,7 +24,9 @@ public class RightClickNodeHandler implements NodeHandler {
 
     @Override
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
-        new Actions(context.driver()).contextClick(StepTargets.require(node, context, finder)).perform();
+        var element = StepTargets.require(node, context, finder);
+        Pointer.aim(context.driver(), element);
+        new Actions(context.driver()).contextClick(element).perform();
         return NodeOutput.pass("Right clicked");
     }
 }

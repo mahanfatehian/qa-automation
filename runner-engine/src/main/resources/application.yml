@@ -17,3 +17,5 @@ blueprintqa:
   selenium-grid-url: ${SELENIUM_GRID_URL:http://selenium-hub:4444}
   queue: queue:workflow_jobs
   telemetry-channel: telemetry:workflow_events
+  runner-slots: ${RUNNER_SLOTS:0}
+  runner-queue: ${RUNNER_QUEUE:64}

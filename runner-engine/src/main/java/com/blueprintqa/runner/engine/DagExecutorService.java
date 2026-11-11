@@ -18,24 +18,34 @@ import org.springframework.stereotype.Service;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class DagExecutorService {
     private static final Logger log = LoggerFactory.getLogger(DagExecutorService.class);
+    private static final java.util.Set<String> INSPECT_SKIP = java.util.Set.of(
+            "SCREENSHOT", "ASSERT", "VERIFY", "READ_URL", "READ_TITLE", "COUNT_ELEMENTS", "EXTRACT_CONTENT", "IF_CONDITION"
+    );
     private final ObjectMapper mapper;
     private final NodeRegistry registry;
     private final SeleniumFactory selenium;
     private final TelemetryPublisher telemetry;
     private final ActiveSessions sessions;
+    private final GridBudget budget;
+    private final InspectBrowserPool inspectBrowsers;
 
-    public DagExecutorService(ObjectMapper mapper, NodeRegistry registry, SeleniumFactory selenium, TelemetryPublisher telemetry, ActiveSessions sessions) {
+    public DagExecutorService(ObjectMapper mapper, NodeRegistry registry, SeleniumFactory selenium, TelemetryPublisher telemetry, ActiveSessions sessions, GridBudget budget, InspectBrowserPool inspectBrowsers) {
         this.mapper = mapper;
         this.registry = registry;
         this.selenium = selenium;
         this.telemetry = telemetry;
         this.sessions = sessions;
+        this.budget = budget;
+        this.inspectBrowsers = inspectBrowsers;
     }
 
     public void executeJob(String json) {
@@ -47,13 +57,14 @@ public class DagExecutorService {
             return;
         }
         WebDriver driver = null;
+        budget.acquire();
         try {
             telemetry.publish(job, "RUN_STARTED", "", "", 0, "Blueprint started", "", Map.of(), "");
             GraphNode start = job.start();
             driver = selenium.open(start, job.workflowName);
             sessions.add(driver);
             ExecutionContext context = new ExecutionContext(driver, job.variables);
-            runNode(start, job, context, new int[]{0});
+            runNode(start, job, context, new AtomicInteger(0));
             telemetry.publish(job, "RUN_COMPLETED", "", "", 0, "Blueprint passed", "", Map.of(), screenshot(driver));
         } catch (Exception ex) {
             log.warn("blueprint {} failed: {}", job.runId, ex.getMessage());
@@ -67,29 +78,83 @@ public class DagExecutorService {
                     log.debug("driver already closed");
                 }
             }
+            budget.release();
         }
     }
 
     public WebDriver openContext(WorkflowJob job, String stopBefore) {
         GraphNode start = job.start();
-        WebDriver driver = selenium.open(start, "inspect", 1);
+        WebDriver driver = inspectBrowsers.take(start);
         sessions.add(driver);
-        driver.manage().timeouts().pageLoadTimeout(java.time.Duration.ofSeconds(20));
+        driver.manage().timeouts().pageLoadTimeout(java.time.Duration.ofSeconds(12));
+        driver.manage().timeouts().scriptTimeout(java.time.Duration.ofSeconds(8));
+        ElementFinder.INSPECT_CAP.set(4);
         try {
-            replayNode(start, job, new ExecutionContext(driver, job.variables), stopBefore, new int[]{0});
-        } catch (Exception ex) {
-            if (driver.getCurrentUrl() == null || driver.getCurrentUrl().startsWith("data:")) {
-                throw ex;
+            ExecutionContext context = new ExecutionContext(driver, job.variables);
+            context.setVariable("__inspect", Boolean.TRUE);
+            for (GraphNode node : InspectPath.prefix(job, stopBefore)) {
+                replayFast(node, job, context);
             }
+        } finally {
+            ElementFinder.INSPECT_CAP.remove();
         }
-        String current = driver.getCurrentUrl();
-        if (current == null || current.isBlank() || current.startsWith("data:")) {
+        if (blank(driver)) {
             String url = firstUrl(job);
             if (!url.isBlank()) {
                 driver.navigate().to(url);
             }
         }
         return driver;
+    }
+
+    public void parkInspect(WebDriver driver) {
+        if (driver == null) {
+            return;
+        }
+        sessions.remove(driver);
+        inspectBrowsers.park(driver);
+    }
+
+    public void discardInspect(WebDriver driver) {
+        if (driver == null) {
+            return;
+        }
+        sessions.remove(driver);
+        inspectBrowsers.discard(driver);
+    }
+
+    private void replayFast(GraphNode node, WorkflowJob job, ExecutionContext context) {
+        if (node == null || INSPECT_SKIP.contains(node.semanticType())) {
+            return;
+        }
+        resolveInputs(node, job, context);
+        if ("LOOP_ELEMENTS".equals(node.semanticType())) {
+            String xpath = context.interpolate(node.str("xpath", ""));
+            if (xpath.isBlank()) {
+                return;
+            }
+            java.util.List<org.openqa.selenium.WebElement> found = context.driver().findElements(org.openqa.selenium.By.xpath(xpath));
+            if (!found.isEmpty()) {
+                context.setPin(node.id, "current_element", found.get(0));
+                context.setPin(node.id, "current_element_ref", new ElementRef("XPATH", "(" + xpath + ")[1]"));
+            }
+            return;
+        }
+        try {
+            NodeOutput output = registry.get(node.semanticType()).execute(node, context);
+            store(node, output, context);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Could not reach this step: " + node.str("title", node.semanticType()) + " — " + ex.getMessage(), ex);
+        }
+    }
+
+    private boolean blank(WebDriver driver) {
+        try {
+            String current = driver.getCurrentUrl();
+            return current == null || current.isBlank() || current.startsWith("data:") || current.startsWith("about:");
+        } catch (Exception ex) {
+            return true;
+        }
     }
 
     private String firstUrl(WorkflowJob job) {
@@ -119,7 +184,8 @@ public class DagExecutorService {
             NodeOutput output = registry.get(node.semanticType()).execute(node, context);
             store(node, output, context);
             String handle = output.nextExec == null || output.nextExec.isBlank() ? "exec_out" : output.nextExec;
-            for (GraphNode next : successors(job, node.id, handle)) {
+            GraphNode next = replayTarget(job, node.id, handle, stopBefore);
+            if (next != null) {
                 replayNode(next, job, context, stopBefore, steps);
             }
         } catch (Exception ex) {
@@ -127,9 +193,9 @@ public class DagExecutorService {
         }
     }
 
-    private void runNode(GraphNode node, WorkflowJob job, ExecutionContext context, int[] steps) {
+    private void runNode(GraphNode node, WorkflowJob job, ExecutionContext context, AtomicInteger steps) {
         int guard = job.maxSteps <= 0 ? 500 : job.maxSteps;
-        if (steps[0]++ >= guard) {
+        if (steps.incrementAndGet() > guard) {
             throw new IllegalStateException("Stopped: this blueprint hit the " + guard + " step guard");
         }
         resolveInputs(node, job, context);
@@ -144,18 +210,21 @@ public class DagExecutorService {
             }
             output = registry.get(node.semanticType()).execute(node, context);
         } catch (Exception ex) {
-            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), friendly(ex), stack(ex), stepDetail(node, context, Map.of()), screenshot(context.driver()));
+            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), branched(context, friendly(ex)), stack(ex), stepDetail(node, context, Map.of()), screenshot(context.driver()));
             throw new IllegalStateException(where(context) + friendly(ex), ex);
         }
         store(node, output, context);
-            telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), output.message, "", stepDetail(node, context, output.pins), screenshot(context.driver()));
         String handle = output.nextExec == null || output.nextExec.isBlank() ? "exec_out" : output.nextExec;
-        for (GraphNode next : successors(job, node.id, handle)) {
-            runNode(next, job, context, steps);
+        List<GraphNode> next = successors(job, node.id, handle);
+        String note = output.message == null ? "" : output.message;
+        if (next.size() > 1) {
+            note = (note.isBlank() ? "" : note + " · ") + "forked " + next.size() + " browsers";
         }
+        telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), branched(context, note), "", stepDetail(node, context, output.pins), screenshot(context.driver()));
+        dispatch(next, job, context, steps);
     }
 
-    private void runLoop(GraphNode node, WorkflowJob job, ExecutionContext context, int[] steps, long started) {
+    private void runLoop(GraphNode node, WorkflowJob job, ExecutionContext context, AtomicInteger steps, long started) {
         String xpath = context.interpolate(node.str("xpath", ""));
         if (xpath == null || xpath.isBlank()) {
             throw new IllegalArgumentException("Repeat for each needs an XPath");
@@ -172,15 +241,149 @@ public class DagExecutorService {
                 break;
             }
             context.setPin(node.id, "current_element", fresh.get(index));
+            context.setPin(node.id, "current_element_ref", new ElementRef("XPATH", "(" + xpath + ")[" + (index + 1) + "]"));
             context.setVariable("loop_index", index);
             context.setVariable("loop_count", count);
-            for (GraphNode child : body) {
-                runNode(child, job, context, steps);
+            dispatch(body, job, context, steps);
+        }
+        dispatch(successors(job, node.id, "exec_completed"), job, context, steps);
+    }
+
+    private void dispatch(List<GraphNode> next, WorkflowJob job, ExecutionContext context, AtomicInteger steps) {
+        if (next == null || next.isEmpty()) {
+            return;
+        }
+        if (next.size() == 1) {
+            runNode(next.get(0), job, context, steps);
+            return;
+        }
+        fork(next, job, context, steps);
+    }
+
+    private void fork(List<GraphNode> next, WorkflowJob job, ExecutionContext context, AtomicInteger steps) {
+        BrowserCheckpoint checkpoint = BrowserCheckpoint.capture(context.driver());
+        ExecutionContext origin = context.fork(context.driver(), context.branch());
+        List<Integer> serial = new ArrayList<>();
+        List<Thread> parallel = new ArrayList<>();
+        List<Throwable> failures = new ArrayList<>();
+        for (int index = 1; index < next.size(); index++) {
+            if (!budget.tryAcquire(2)) {
+                serial.add(index);
+                continue;
+            }
+            int branch = index + 1;
+            GraphNode target = next.get(index);
+            Thread thread = Thread.ofVirtual().name("branch-" + job.runId + "-" + branch).start(() -> {
+                WebDriver clone = null;
+                try {
+                    clone = selenium.open(job.start(), sessionName(job, branch), 4);
+                    sessions.add(clone);
+                    checkpoint.restore(clone);
+                    runNode(target, job, origin.fork(clone, branchName(context, branch)), steps);
+                } catch (Exception ex) {
+                    synchronized (failures) {
+                        failures.add(ex);
+                    }
+                } finally {
+                    if (clone != null) {
+                        sessions.remove(clone);
+                        try {
+                            clone.quit();
+                        } catch (Exception ignored) {
+                            log.debug("branch browser already closed");
+                        }
+                    }
+                    budget.release();
+                }
+            });
+            parallel.add(thread);
+        }
+        try {
+            runNode(next.get(0), job, origin.fork(context.driver(), branchName(context, 1)), steps);
+        } catch (Exception ex) {
+            failures.add(ex);
+        }
+        for (Thread thread : parallel) {
+            try {
+                thread.join();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                failures.add(ex);
             }
         }
-        for (GraphNode next : successors(job, node.id, "exec_completed")) {
-            runNode(next, job, context, steps);
+        for (int index : serial) {
+            int branch = index + 1;
+            try {
+                checkpoint.restore(context.driver());
+                runNode(next.get(index), job, origin.fork(context.driver(), branchName(context, branch)), steps);
+            } catch (Exception ex) {
+                failures.add(ex);
+            }
         }
+        if (!failures.isEmpty()) {
+            Throwable first = failures.get(0);
+            if (first instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new IllegalStateException(first.getMessage(), first);
+        }
+    }
+
+    private String branchName(ExecutionContext context, int branch) {
+        if (context.branch() == null || context.branch().isBlank()) {
+            return "branch " + branch;
+        }
+        return context.branch() + "." + branch;
+    }
+
+    private String sessionName(WorkflowJob job, int branch) {
+        String name = job.workflowName == null || job.workflowName.isBlank() ? "blueprint" : job.workflowName;
+        return name + " · branch " + branch;
+    }
+
+    private String branched(ExecutionContext context, String message) {
+        String text = message == null ? "" : message;
+        if (context.branch() == null || context.branch().isBlank()) {
+            return text;
+        }
+        return text.isBlank() ? context.branch() : context.branch() + " · " + text;
+    }
+
+    private GraphNode replayTarget(WorkflowJob job, String nodeId, String handle, String stopBefore) {
+        List<GraphNode> next = successors(job, nodeId, handle);
+        if (next.isEmpty()) {
+            return null;
+        }
+        if (stopBefore == null || stopBefore.isBlank()) {
+            return next.get(0);
+        }
+        for (GraphNode candidate : next) {
+            if (reaches(job, candidate, stopBefore, new HashSet<>())) {
+                return candidate;
+            }
+        }
+        return next.get(0);
+    }
+
+    private boolean reaches(WorkflowJob job, GraphNode node, String stopBefore, Set<String> seen) {
+        if (node == null || stopBefore == null || !seen.add(node.id)) {
+            return false;
+        }
+        if (stopBefore.equals(node.id)) {
+            return true;
+        }
+        if (job.edges == null) {
+            return false;
+        }
+        for (GraphEdge edge : job.edges) {
+            if (edge == null || !node.id.equals(edge.source) || !edge.sourceHandleOrDefault().startsWith("exec_")) {
+                continue;
+            }
+            if (reaches(job, job.node(edge.target), stopBefore, seen)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void resolveInputs(GraphNode node, WorkflowJob job, ExecutionContext context) {
@@ -198,6 +401,10 @@ public class DagExecutorService {
             }
             Object value = context.getPin(edge.source, edge.sourceHandleOrDefault());
             context.putInput(target, value);
+            Object ref = context.getPin(edge.source, edge.sourceHandleOrDefault() + "_ref");
+            if (ref != null) {
+                context.putInput(target + "_ref", ref);
+            }
         }
     }
 
@@ -305,6 +512,9 @@ public class DagExecutorService {
         String selector = node.str("query", node.str("xpath", ""));
         if (!selector.isBlank()) {
             detail.put("selector", selector);
+        }
+        if (context.branch() != null && !context.branch().isBlank()) {
+            detail.put("branch", context.branch());
         }
         return detail;
     }

@@ -121,7 +121,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
         </div>
         <div className="grid min-h-0 flex-1 grid-cols-[1fr_300px]">
           <div className="overflow-auto bg-[#070d14] p-3">
-            {busy && <p className="text-sm text-[#8ea6bb]">Opening the page in its current state...</p>}
+            {busy && <p className="text-sm text-[#8ea6bb]">Replaying the path to this step...</p>}
             {error && (
               <div className="mb-3">
                 <p className="text-sm text-[#ff8fa3]">{error}</p>
@@ -134,7 +134,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
                   ref={imageRef}
                   alt="Current page"
                   className="max-w-full cursor-crosshair"
-                  src={`data:image/png;base64,${session.screenshot_base64}`}
+                  src={`data:${session.screenshot_mime || "image/png"};base64,${session.screenshot_base64}`}
                   onMouseMove={move}
                   onClick={lock}
                 />

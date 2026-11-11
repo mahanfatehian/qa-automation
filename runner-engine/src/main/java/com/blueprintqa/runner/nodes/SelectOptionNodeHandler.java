@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
@@ -32,12 +33,7 @@ public class SelectOptionNodeHandler implements NodeHandler {
         if (choice == null || choice.isBlank()) {
             throw new IllegalArgumentException("Select needs an option");
         }
-        Select select = new Select(element);
-        if ("VALUE".equalsIgnoreCase(node.str("by", "TEXT"))) {
-            select.selectByValue(choice);
-        } else {
-            select.selectByVisibleText(choice);
-        }
+        Pointer.choose(element, choice, "VALUE".equalsIgnoreCase(node.str("by", "TEXT")));
         NodeOutput output = NodeOutput.pass("Selected " + choice);
         output.pins.put("text_out", choice);
         return output;

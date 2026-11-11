@@ -14,6 +14,8 @@ import java.util.Locale;
 
 @Component
 public class ElementFinder {
+    public static final ThreadLocal<Integer> INSPECT_CAP = new ThreadLocal<>();
+
     private static final String CSS_SCRIPT = """
             const selector = String(arguments[0] || '');
             const walk = (root) => {
@@ -66,6 +68,10 @@ public class ElementFinder {
         }
         String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
         int timeout = Math.max(1, timeoutSeconds);
+        Integer cap = INSPECT_CAP.get();
+        if (cap != null) {
+            timeout = Math.min(timeout, cap);
+        }
         try {
             if ("CSS".equals(kind)) {
                 return waitJs(driver, timeout, CSS_SCRIPT, query);
@@ -88,6 +94,7 @@ public class ElementFinder {
         String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
         return switch (kind) {
             case "CSS" -> By.cssSelector(query);
+            case "CLASS" -> By.className(query);
             case "ID" -> By.id(query);
             case "NAME" -> By.name(query);
             case "LINK_TEXT" -> By.linkText(query);

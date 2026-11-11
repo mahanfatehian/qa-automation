@@ -1,6 +1,7 @@
 package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
 import org.openqa.selenium.JavascriptExecutor;
@@ -26,20 +27,23 @@ public class NavigateNodeHandler implements NodeHandler {
             throw new IllegalArgumentException("Open page needs a URL");
         }
         int timeout = Math.max(5, node.integer("timeoutSeconds", 30));
+        if (Boolean.TRUE.equals(context.variable("__inspect"))) {
+            timeout = Math.min(timeout, 12);
+        }
         context.driver().manage().timeouts().pageLoadTimeout(Duration.ofSeconds(timeout));
         Exception last = null;
-        for (int attempt = 1; attempt <= 2; attempt++) {
+        int tries = Boolean.TRUE.equals(context.variable("__inspect")) ? 1 : 2;
+        for (int attempt = 1; attempt <= tries; attempt++) {
             try {
                 context.driver().navigate().to(url);
-                new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(driver -> {
-                    Object state = ((JavascriptExecutor) driver).executeScript("return document.readyState");
-                    return "complete".equals(state) || "interactive".equals(state);
-                });
+                new WebDriverWait(context.driver(), Duration.ofSeconds(timeout)).until(driver ->
+                        "complete".equals(((JavascriptExecutor) driver).executeScript("return document.readyState"))
+                );
                 last = null;
                 break;
             } catch (Exception ex) {
                 last = ex;
-                if (attempt == 2) {
+                if (attempt == tries) {
                     throw new IllegalStateException("Open page failed for " + url + ": " + ex.getMessage(), ex);
                 }
             }
@@ -47,7 +51,11 @@ public class NavigateNodeHandler implements NodeHandler {
         if (last != null) {
             throw new IllegalStateException("Open page failed for " + url, last);
         }
+        Pointer.settle(context.driver());
         String current = context.driver().getCurrentUrl();
+        if (current == null || current.isBlank() || current.startsWith("data:") || current.startsWith("about:")) {
+            throw new IllegalStateException("Open page did not land. The browser is still on a blank page.");
+        }
         NodeOutput output = NodeOutput.pass(current);
         output.pins.put("text_out", current);
         return output;

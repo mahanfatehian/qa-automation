@@ -15,6 +15,7 @@ public class ExecutionContext {
     private final Map<String, Object> variables;
     private final Map<String, Map<String, Object>> pins = new HashMap<>();
     private final Map<String, Object> inputs = new HashMap<>();
+    private String branch = "";
 
     public ExecutionContext(WebDriver driver, Map<String, Object> variables) {
         this.driver = driver;
@@ -23,6 +24,24 @@ public class ExecutionContext {
 
     public WebDriver driver() {
         return driver;
+    }
+
+    public String branch() {
+        return branch;
+    }
+
+    public synchronized ExecutionContext fork(WebDriver next, String branchName) {
+        ExecutionContext copy = new ExecutionContext(next, new HashMap<>(variables));
+        copy.branch = branchName == null ? "" : branchName;
+        for (Map.Entry<String, Map<String, Object>> nodePins : pins.entrySet()) {
+            for (Map.Entry<String, Object> pin : nodePins.getValue().entrySet()) {
+                if (pin.getValue() instanceof WebElement) {
+                    continue;
+                }
+                copy.setPin(nodePins.getKey(), pin.getKey(), pin.getValue());
+            }
+        }
+        return copy;
     }
 
     public void clearInputs() {
@@ -47,6 +66,18 @@ public class ExecutionContext {
         Object current = inputs.get("current_element");
         if (current instanceof WebElement element) {
             return element;
+        }
+        return null;
+    }
+
+    public ElementRef elementRef() {
+        Object direct = inputs.get("element_in_ref");
+        if (direct instanceof ElementRef ref) {
+            return ref;
+        }
+        Object current = inputs.get("current_element_ref");
+        if (current instanceof ElementRef ref) {
+            return ref;
         }
         return null;
     }

@@ -2,7 +2,7 @@ from uuid import UUID
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -69,6 +69,16 @@ async def screenshot(run_id: UUID, result_id: UUID, db: AsyncSession = Depends(g
     except Exception as exc:
         raise HTTPException(status_code=422, detail="Screenshot could not be decoded") from exc
     return Response(content=raw, media_type="image/png")
+
+
+@router.delete("/{run_id}", status_code=204)
+async def delete_run(run_id: UUID, db: AsyncSession = Depends(get_db)) -> None:
+    row = await db.get(TestRun, run_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    await db.execute(delete(NodeResult).where(NodeResult.run_id == run_id))
+    await db.delete(row)
+    await db.commit()
 
 
 @router.get("/{run_id}/junit")

@@ -146,27 +146,14 @@ public class InspectController {
             job.maxSteps = 80;
             driver = executor.openContext(job, text(body.get("stopBefore")));
             String id = UUID.randomUUID().toString();
-            String html = "";
-            try {
-                html = driver.getPageSource();
-            } catch (Exception ignored) {
-                html = "";
-            }
-            held.put(id, new Held(driver, System.currentTimeMillis(), html));
+            held.put(id, new Held(driver, System.currentTimeMillis(), ""));
             Map<String, Object> result = shot(driver);
             result.put("ok", true);
             result.put("sessionId", id);
             result.put("error", null);
             return result;
         } catch (Exception ex) {
-            if (driver != null) {
-                activeSessions.remove(driver);
-                try {
-                    driver.quit();
-                } catch (Exception ignored) {
-                    // already closed
-                }
-            }
+            executor.parkInspect(driver);
             return Map.of("ok", false, "error", ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
         }
     }
@@ -210,12 +197,7 @@ public class InspectController {
     public Map<String, Object> close(@PathVariable String id) {
         Held session = held.remove(id);
         if (session != null) {
-            activeSessions.remove(session.driver);
-            try {
-                session.driver.quit();
-            } catch (Exception ignored) {
-                // already closed
-            }
+            executor.parkInspect(session.driver);
         }
         return Map.of("ok", true);
     }
@@ -236,25 +218,13 @@ public class InspectController {
             if (now - entry.getValue().touched < TTL_MS) {
                 return false;
             }
-            activeSessions.remove(entry.getValue().driver);
-            try {
-                entry.getValue().driver.quit();
-            } catch (Exception ignored) {
-                // already closed
-            }
+            executor.discardInspect(entry.getValue().driver);
             return true;
         });
     }
 
     private void closeAll() {
-        held.values().forEach(session -> {
-            activeSessions.remove(session.driver);
-            try {
-                session.driver.quit();
-            } catch (Exception ignored) {
-                // already closed
-            }
-        });
+        held.values().forEach(session -> executor.parkInspect(session.driver));
         held.clear();
     }
 
@@ -262,10 +232,27 @@ public class InspectController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("currentUrl", driver.getCurrentUrl());
         result.put("title", driver.getTitle());
-        result.put("screenshotBase64", ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64));
+        String jpeg = jpeg(driver);
+        result.put("screenshotBase64", jpeg != null ? jpeg : ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64));
+        result.put("screenshotMime", jpeg != null ? "image/jpeg" : "image/png");
         Object size = ((JavascriptExecutor) driver).executeScript("return {width: window.innerWidth, height: window.innerHeight}");
         result.put("viewport", size);
         return result;
+    }
+
+    private String jpeg(WebDriver driver) {
+        try {
+            WebDriver augmented = new org.openqa.selenium.remote.Augmenter().augment(driver);
+            if (augmented instanceof org.openqa.selenium.chromium.HasCdp cdp) {
+                Object raw = cdp.executeCdpCommand("Page.captureScreenshot", Map.of("format", "jpeg", "quality", 55));
+                if (raw instanceof Map<?, ?> map && map.get("data") != null) {
+                    return String.valueOf(map.get("data"));
+                }
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
     }
 
     private String text(Object value) {

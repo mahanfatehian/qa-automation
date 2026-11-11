@@ -66,7 +66,9 @@ public class TelemetryPublisher {
         }
         for (Map.Entry<String, Object> entry : pins.entrySet()) {
             Object value = entry.getValue();
-            if (value instanceof WebElement element) {
+            if (entry.getKey().endsWith("_ref") || value instanceof ElementRef) {
+                continue;
+            } else if (value instanceof WebElement element) {
                 out.put(entry.getKey(), summarize(element));
             } else if (value instanceof String text) {
                 out.put(entry.getKey(), text.length() > 4000 ? text.substring(0, 4000) + "..." : text);

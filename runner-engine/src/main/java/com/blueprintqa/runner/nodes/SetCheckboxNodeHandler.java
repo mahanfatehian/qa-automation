@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
@@ -25,11 +26,9 @@ public class SetCheckboxNodeHandler implements NodeHandler {
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
         WebElement element = StepTargets.require(node, context, finder);
         boolean want = node.bool("checked", true);
-        if (element.isSelected() != want) {
-            element.click();
-        }
+        boolean landed = Pointer.check(context.driver(), element, want);
         NodeOutput output = NodeOutput.pass(want ? "Checked" : "Unchecked");
-        output.pins.put("bool_out", element.isSelected());
+        output.pins.put("bool_out", landed);
         return output;
     }
 }

@@ -58,6 +58,19 @@ class ScheduleOut(BaseModel):
     created_at: datetime
 
 
+class ScheduleLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workflow_id: UUID
+    schedule_id: UUID | None = None
+    run_id: UUID | None = None
+    level: str
+    message: str
+    detail: dict
+    created_at: datetime
+
+
 class RunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -66,6 +79,7 @@ class RunOut(BaseModel):
     status: str
     trigger: str
     error_message: str | None = None
+    variation_label: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime
@@ -112,7 +126,7 @@ class InspectResolveIn(BaseModel):
 class PickIn(BaseModel):
     url: str
     browser: str = "chrome"
-    headless: bool = True
+    headless: bool = False
 
 
 class ProbeIn(BaseModel):
@@ -121,4 +135,4 @@ class ProbeIn(BaseModel):
     query: str
     timeout_seconds: int = Field(default=10, ge=1, le=60)
     browser: str = "chrome"
-    headless: bool = True
+    headless: bool = False

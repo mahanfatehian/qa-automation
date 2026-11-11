@@ -6,11 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import SessionLocal, get_db
-from app.models import TestRun, Workflow, WorkflowSchedule
+from app.models import ScheduleLog, TestRun, Workflow, WorkflowSchedule
 from app.redis_bus import enqueue_run
 from app.scheduler import add_job, remove_job, validate_schedule
 from app.tokens import token_ok
-from app.schemas import RunOut, ScheduleCreate, ScheduleOut, ScheduleUpdate
+from app.schemas import RunOut, ScheduleCreate, ScheduleLogOut, ScheduleOut, ScheduleUpdate
 from app.validation import GraphError, validate_graph
 
 router = APIRouter(tags=["schedules"])
@@ -26,6 +26,16 @@ async def list_schedules(workflow_id: UUID, db: AsyncSession = Depends(get_db)) 
             select(WorkflowSchedule)
             .where(WorkflowSchedule.workflow_id == workflow_id)
             .order_by(WorkflowSchedule.created_at.desc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+@router.get("/api/v1/workflows/{workflow_id}/automation-logs", response_model=list[ScheduleLogOut])
+async def automation_logs(workflow_id: UUID, db: AsyncSession = Depends(get_db)) -> list[ScheduleLog]:
+    rows = (
+        await db.execute(
+            select(ScheduleLog).where(ScheduleLog.workflow_id == workflow_id).order_by(ScheduleLog.created_at.desc()).limit(30)
         )
     ).scalars().all()
     return list(rows)

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models import NodeResult, TestRun, Workflow, utcnow
+from app.models import NodeResult, ScheduleLog, TestRun, Workflow, utcnow
 from app.ws import manager
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,59 @@ def example_rows(graph: dict) -> list[dict]:
     return rows[:25]
 
 
+def planned_rows(graph: dict) -> list[dict]:
+    import random
+    import re
+
+    uses: dict[str, dict] = {}
+    for node in graph.get("nodes") or []:
+        data = (node or {}).get("data") or {}
+        specs = data.get("inputUses") if isinstance(data.get("inputUses"), dict) else {}
+        blob = " ".join(str(value) for value in data.values() if isinstance(value, str))
+        for name in re.findall(r"\{\{\s*([\w.-]+)\s*\}\}", blob):
+            spec = specs.get(name)
+            uses[name] = spec if isinstance(spec, dict) else {"mode": "one"}
+    if not uses:
+        return []
+    expanding: list[tuple[str, list[str]]] = []
+    fixed: dict[str, str] = {}
+    for name, spec in uses.items():
+        pool = _pool(graph, name)
+        mode = str(spec.get("mode") or "one")
+        chosen = [str(value) for value in (spec.get("values") or []) if str(value)]
+        if mode == "all":
+            expanding.append((name, pool or [""]))
+        elif mode == "selected":
+            expanding.append((name, chosen or [""]))
+        elif mode == "random-selected":
+            pick_from = chosen or pool
+            fixed[name] = random.choice(pick_from) if pick_from else ""
+        elif mode == "random":
+            fixed[name] = random.choice(pool) if pool else ""
+        else:
+            fixed[name] = chosen[0] if chosen else (pool[0] if pool else "")
+    if not expanding:
+        return [fixed]
+    rows = [dict(fixed)]
+    for name, values in expanding:
+        rows = [{**row, name: value} for row in rows for value in values]
+    return rows[:25]
+
+
+def _pool(graph: dict, name: str) -> list[str]:
+    found: list[str] = []
+    for row in example_rows(graph):
+        value = row.get(name)
+        if value not in (None, "") and str(value) not in found:
+            found.append(str(value))
+    for column in graph.get("dataColumns") or []:
+        if isinstance(column, dict) and column.get("name") == name:
+            for option in column.get("options") or []:
+                if option and str(option) not in found:
+                    found.append(str(option))
+    return found
+
+
 async def enqueue_run(session: AsyncSession, workflow: Workflow, trigger: str) -> TestRun:
     if trigger in {"CRON", "INTERVAL"}:
         active = await session.scalar(
@@ -102,15 +155,18 @@ async def enqueue_run(session: AsyncSession, workflow: Workflow, trigger: str) -
         )
         if active:
             raise BusyError("A run for this blueprint is already queued or running")
-    rows = example_rows(workflow.graph or {})
+    rows = planned_rows(workflow.graph or {})
     queued: list[tuple[TestRun, dict | None, int | None]] = []
     if not rows:
         run = TestRun(workflow_id=workflow.id, status="QUEUED", trigger=trigger)
         session.add(run)
         queued.append((run, None, None))
     else:
+        total = len(rows)
         for index, row in enumerate(rows):
-            run = TestRun(workflow_id=workflow.id, status="QUEUED", trigger=trigger)
+            bits = ", ".join(f"{key}={value}" for key, value in row.items())
+            label = f"{index + 1} of {total}" + (f" · {bits}" if bits else "")
+            run = TestRun(workflow_id=workflow.id, status="QUEUED", trigger=trigger, variation_label=label)
             session.add(run)
             queued.append((run, row, index))
     await session.commit()
@@ -179,10 +235,12 @@ async def handle_event(raw: dict) -> None:
         elif kind == "RUN_COMPLETED":
             run.status = "PASSED"
             run.finished_at = now
+            await note_scheduled(session, run, "info")
         elif kind == "RUN_FAILED":
             run.status = "FAILED"
             run.finished_at = now
             run.error_message = (event.get("message") or "Blueprint failed")[:4000]
+            await note_scheduled(session, run, "error")
         elif kind in {"NODE_RUNNING", "NODE_PASSED", "NODE_FAILED"}:
             count = await session.scalar(
                 select(func.count()).select_from(NodeResult).where(NodeResult.run_id == rid)
@@ -208,6 +266,42 @@ async def handle_event(raw: dict) -> None:
             return
         await session.commit()
     await manager.broadcast(run_id, public_event(event))
+
+
+async def note_scheduled(session, run: TestRun, level: str) -> None:
+    if run.trigger not in {"CRON", "INTERVAL"}:
+        return
+    failed = await session.scalar(
+        select(NodeResult).where(NodeResult.run_id == run.id, NodeResult.status == "FAILED").order_by(NodeResult.sequence.desc())
+    )
+    workflow = await session.get(Workflow, run.workflow_id)
+    name = workflow.name if workflow else "Blueprint"
+    detail = {"status": "PASSED" if level == "info" else "FAILED", "trigger": run.trigger}
+    if failed:
+        output = failed.output_data or {}
+        detail.update({
+            "step": failed.node_type,
+            "url": output.get("url") or "",
+            "selector": output.get("selector") or "",
+            "message": failed.message or run.error_message or "",
+        })
+        label = run.variation_label or "single run"
+        detail["variation"] = label
+        text = f"{name} · {label} failed at {failed.node_type}: {detail['message']}"
+        if detail["url"]:
+            text += f" Page: {detail['url']}."
+        if detail["selector"]:
+            text += f" Selector: {detail['selector']}."
+    else:
+        label = getattr(run, "variation_label", None) or "single run"
+        text = f"{name} · {label} passed." if level == "info" else f"{name} · {label} failed: {run.error_message or 'unknown error'}"
+    session.add(ScheduleLog(
+        workflow_id=run.workflow_id,
+        run_id=run.id,
+        level="error" if level != "info" else "info",
+        message=text[:2000],
+        detail=detail,
+    ))
 
 
 async def listen() -> None:

@@ -1,9 +1,12 @@
 import type { Node } from "@xyflow/react";
 import { CATALOG_BY_TYPE } from "../catalog";
+import type { DataColumn } from "./TestDataDesk";
 import type { BlueprintData } from "../types/blueprint";
 
 type Props = {
   node: Node<BlueprintData> | null;
+  dataColumns: DataColumn[];
+  rows: Array<Record<string, string>>;
   onChange: (id: string, patch: Record<string, unknown>) => void;
   onProbe: (node: Node<BlueprintData>) => void;
   onPick: (node: Node<BlueprintData>) => void;
@@ -11,7 +14,7 @@ type Props = {
   probeMessage: string;
 };
 
-export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeMessage }: Props) {
+export function NodeInspector({ node, dataColumns, rows, onChange, onProbe, onPick, probing, probeMessage }: Props) {
   if (!node) {
     return (
       <aside className="panel w-72 shrink-0 border-l border-line p-4 text-sm text-[#8ea6bb]">
@@ -19,6 +22,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       </aside>
     );
   }
+  fieldColumns = dataColumns;
   const data = node.data;
   const def = CATALOG_BY_TYPE[String(data.nodeType)];
   const set = (patch: Record<string, unknown>) => onChange(node.id, patch);
@@ -49,7 +53,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       )}
       {data.nodeType === "SEARCH_ELEMENT" && (
         <>
-          <Select label="Find by" value={String(data.strategy || "XPATH")} options={STRATEGIES} onChange={(strategy) => set({ strategy })} />
+          <FindBy value={String(data.strategy || "XPATH")} onChange={(strategy) => set({ strategy })} />
           <Area label="Query" value={String(data.query || "")} onChange={(query) => set({ query })} />
           <NumberField label="Timeout seconds" value={Number(data.timeoutSeconds || 10)} onChange={(timeoutSeconds) => set({ timeoutSeconds })} />
           <button className="btn mb-2 w-full" disabled={probing} onClick={() => onProbe(node)}>{probing ? "Probing grid..." : "Probe this selector"}</button>
@@ -57,12 +61,15 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
         </>
       )}
       {(data.nodeType === "CLICK" || data.nodeType === "TYPE_TEXT") && (
-        <Text label="XPath if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />
+        <>
+          <FindBy value={String(data.strategy || "XPATH")} onChange={(strategy) => set({ strategy })} />
+          <Text label="Selector if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath, query: xpath })} />
+        </>
       )}
       {data.nodeType === "CLICK" && <Check label="Force JavaScript click" checked={Boolean(data.forceJsClick)} onChange={(forceJsClick) => set({ forceJsClick })} />}
       {data.nodeType === "TYPE_TEXT" && (
         <>
-          <Text label="Text" value={String(data.text || "")} onChange={(text) => set({ text })} />
+          <SiteValue label="Text typed into the page" value={String(data.text || "")} onChange={(text) => set({ text })} />
           <Check label="Clear first" checked={data.clearFirst !== false} onChange={(clearFirst) => set({ clearFirst })} />
           <Check label="Press Enter" checked={Boolean(data.pressEnter)} onChange={(pressEnter) => set({ pressEnter })} />
         </>
@@ -101,13 +108,24 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
               <NumberField label="Pixels" value={Number(data.pixels || 600)} onChange={(pixels) => set({ pixels })} />
             </>
           ) : null}
-          {data.mode === "ELEMENT" && <Text label="XPath if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />}
+          {data.mode === "ELEMENT" && (
+            <>
+              <FindBy value={String(data.strategy || "XPATH")} onChange={(strategy) => set({ strategy })} />
+              <Text label="Selector if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />
+            </>
+          )}
         </>
       )}
       {data.nodeType === "SELECT_OPTION" && (
         <>
-          <Text label="Option" value={String(data.option || "")} onChange={(option) => set({ option })} />
+          <SiteValue label="Option chosen on the page" value={String(data.option || "")} onChange={(option) => set({ option })} />
           <Select label="Match by" value={String(data.by || "TEXT")} options={["TEXT", "VALUE"]} onChange={(by) => set({ by })} />
+        </>
+      )}
+      {["HOVER", "ENTER_FRAME", "DOUBLE_CLICK", "RIGHT_CLICK", "DRAG_DROP"].includes(String(data.nodeType)) && (
+        <>
+          <FindBy value={String(data.strategy || "XPATH")} onChange={(strategy) => set({ strategy })} />
+          <Text label="Selector if no element pin" value={String(data.xpath || data.query || "")} onChange={(xpath) => set({ xpath, query: xpath })} />
         </>
       )}
       {data.nodeType === "PRESS_KEY" && <Text label="Key" value={String(data.key || "ENTER")} onChange={(key) => set({ key })} />}
@@ -122,7 +140,7 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       {data.nodeType === "VERIFY" && (
         <>
           <Select label="Check" value={String(data.check || "VISIBLE")} options={["VISIBLE", "ENABLED", "SELECTED", "ATTRIBUTE", "COUNT", "TEXT_CONTAINS", "TEXT_EQUALS", "URL_CONTAINS", "URL_EQUALS", "TITLE_CONTAINS"]} onChange={(check) => set({ check })} />
-          <Select label="Find by" value={String(data.strategy || "XPATH")} options={STRATEGIES} onChange={(strategy) => set({ strategy })} />
+          <FindBy value={String(data.strategy || "XPATH")} onChange={(strategy) => set({ strategy })} />
           <Text label="Selector if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath })} />
           {data.check === "ATTRIBUTE" && <Text label="Attribute" value={String(data.attributeName || "")} onChange={(attributeName) => set({ attributeName })} />}
           <Text label="Expected" value={String(data.expected || "")} onChange={(expected) => set({ expected })} />
@@ -143,6 +161,33 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
       )}
       {data.nodeType === "DRAG_DROP" && <Text label="Target selector" value={String(data.targetXpath || "")} onChange={(targetXpath) => set({ targetXpath })} />}
       {data.nodeType === "SCREENSHOT" && <Text label="Label" value={String(data.label || "")} onChange={(label) => set({ label })} />}
+      {data.nodeType === "OPEN_TAB" && <SiteValue label="URL" value={String(data.url || "")} onChange={(url) => set({ url })} />}
+      {["FOCUS", "CLEAR_FIELD", "SUBMIT"].includes(String(data.nodeType)) && (
+        <>
+          <FindBy value={String(data.strategy || "CSS")} onChange={(strategy) => set({ strategy })} />
+          <Text label="Selector if no element pin" value={String(data.xpath || "")} onChange={(xpath) => set({ xpath, query: xpath })} />
+        </>
+      )}
+      {data.nodeType === "SET_WINDOW" && (
+        <>
+          <NumberField label="Width" value={Number(data.windowWidth || 1280)} onChange={(windowWidth) => set({ windowWidth })} />
+          <NumberField label="Height" value={Number(data.windowHeight || 800)} onChange={(windowHeight) => set({ windowHeight })} />
+        </>
+      )}
+      {["COUNT_ELEMENTS", "WAIT_GONE"].includes(String(data.nodeType)) && (
+        <>
+          <FindBy value={String(data.strategy || "CSS")} onChange={(strategy) => set({ strategy })} />
+          <Text label="Selector" value={String(data.query || "")} onChange={(query) => set({ query, xpath: query })} />
+        </>
+      )}
+      {data.nodeType === "PAGE_STORAGE" && (
+        <>
+          <Select label="Action" value={String(data.action || "GET")} options={["GET", "SET", "DELETE"]} onChange={(action) => set({ action })} />
+          <Text label="Key" value={String(data.storageKey || "")} onChange={(storageKey) => set({ storageKey })} />
+          {data.action === "SET" && <SiteValue label="Value" value={String(data.storageValue || "")} onChange={(storageValue) => set({ storageValue })} />}
+        </>
+      )}
+      <InputUses data={data} columns={dataColumns} rows={rows} onChange={(inputUses) => set({ inputUses })} />
       {data.nodeType === "ASSERT" && (
         <>
           <Select label="Operator" value={String(data.operator || "NOT_EMPTY")} options={["NOT_EMPTY", "EQUALS", "CONTAINS", "MATCHES_REGEX"]} onChange={(operator) => set({ operator })} />
@@ -153,14 +198,57 @@ export function NodeInspector({ node, onChange, onProbe, onPick, probing, probeM
   );
 }
 
-const STRATEGIES = ["XPATH", "CSS", "ID", "NAME", "LINK_TEXT", "PARTIAL_LINK_TEXT", "TAG", "TEXT_CONTAINS", "REGEX_DOM"];
+const FIND_BY = [
+  ["XPATH", "XPath"],
+  ["CSS", "CSS"],
+  ["CLASS", "Class"],
+  ["ID", "ID"],
+  ["NAME", "Name"],
+  ["LINK_TEXT", "Link text"],
+  ["PARTIAL_LINK_TEXT", "Partial link"],
+  ["TAG", "Tag"],
+  ["TEXT_CONTAINS", "Text contains"],
+  ["REGEX_DOM", "Regex"],
+];
+let fieldColumns: DataColumn[] = [];
 
 function Text({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="field">{label}<input value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return (
+    <label className="field">
+      {label}
+      <input value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function SiteValue({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="field">
+      {label}
+      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <DataPick onPick={onChange} />
+    </label>
+  );
+}
+
+function FindBy({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="field">
+      Find by
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {FIND_BY.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+      </select>
+    </label>
+  );
 }
 
 function Area({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="field">{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return (
+    <label className="field">
+      {label}
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
 }
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
@@ -175,6 +263,59 @@ function Select({ label, value, options, onChange }: { label: string; value: str
         {options.map((option) => <option key={option}>{option}</option>)}
       </select>
     </label>
+  );
+}
+
+function DataPick({ onPick }: { onPick: (value: string) => void }) {
+  if (!fieldColumns.length) return null;
+  return (
+    <select className="btn" value="" onChange={(event) => { if (event.target.value) onPick(event.target.value); }}>
+      <option value="">Use an input</option>
+      {fieldColumns.map((column) => <option key={column.name} value={`{{${column.name}}}`}>{`{{${column.name}}}`}</option>)}
+    </select>
+  );
+}
+
+function InputUses({ data, columns, rows, onChange }: { data: BlueprintData; columns: DataColumn[]; rows: Array<Record<string, string>>;   onChange: (uses: Record<string, { mode?: string; values?: string[] }>) => void }) {
+  const siteText = [data.text, data.option].filter((value) => typeof value === "string").join(" ");
+  const names = [...new Set(siteText.match(/\{\{\s*[\w.-]+\s*\}\}/g)?.map((token) => token.replace(/[{}\s]/g, "")) || [])];
+  const uses = (data.inputUses || {}) as Record<string, { mode?: string; values?: string[] }>;
+  if (!names.length) return null;
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      {names.map((name) => {
+        const spec = uses[name] || { mode: "one", values: [] };
+        const pool = [...new Set(rows.map((row) => row[name]).filter(Boolean).concat(columns.find((column) => column.name === name)?.options || []))];
+        return (
+          <div key={name} className="mb-3">
+            <p className="font-mono text-[11px] text-[#7f6df2]">{`{{${name}}}`}</p>
+            <select className="btn mt-1 w-full" value={spec.mode || "one"} onChange={(event) => onChange({ ...uses, [name]: { mode: event.target.value, values: spec.values || [] } })}>
+              <option value="one">One value I choose</option>
+              <option value="random">One random value</option>
+              <option value="random-selected">Random from the ones I tick</option>
+              <option value="selected">Each ticked value</option>
+              <option value="all">All values</option>
+            </select>
+            {spec.mode === "one" && (
+              <select className="btn mt-1 w-full" value={(spec.values || [])[0] || ""} onChange={(event) => onChange({ ...uses, [name]: { mode: "one", values: event.target.value ? [event.target.value] : [] } })}>
+                <option value="">Choose one</option>
+                {pool.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            )}
+            {(spec.mode === "selected" || spec.mode === "random-selected") && pool.map((value) => (
+              <label key={value} className="mt-1 flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={(spec.values || []).includes(value)} onChange={(event) => {
+                  const current = spec.values || [];
+                  const values = event.target.checked ? [...current, value] : current.filter((item) => item !== value);
+                  onChange({ ...uses, [name]: { mode: spec.mode || "selected", values } });
+                }} />
+                {value}
+              </label>
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

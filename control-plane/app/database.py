@@ -18,6 +18,7 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.exec_driver_sql("ALTER TABLE test_runs ADD COLUMN IF NOT EXISTS variation_label TEXT")
 
 
 async def dispose_db() -> None:

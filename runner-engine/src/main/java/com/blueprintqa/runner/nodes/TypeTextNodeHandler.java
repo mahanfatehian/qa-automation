@@ -2,6 +2,7 @@ package com.blueprintqa.runner.nodes;
 
 import com.blueprintqa.runner.engine.ElementFinder;
 import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.engine.Pointer;
 import com.blueprintqa.runner.engine.StepTargets;
 import com.blueprintqa.runner.model.GraphNode;
 import com.blueprintqa.runner.model.NodeOutput;
@@ -33,16 +34,7 @@ public class TypeTextNodeHandler implements NodeHandler {
         if (text == null) {
             text = "";
         }
-        JavascriptExecutor js = (JavascriptExecutor) context.driver();
-        js.executeScript("arguments[0].scrollIntoView({block:'center'}); arguments[0].focus();", element);
-        if (node.bool("clearFirst", true)) {
-            try {
-                element.clear();
-            } catch (Exception ex) {
-                element.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.DELETE);
-            }
-        }
-        element.sendKeys(text);
+        Pointer.type(context.driver(), element, text, node.bool("clearFirst", true));
         if (node.bool("pressEnter", false)) {
             element.sendKeys(Keys.ENTER);
         }

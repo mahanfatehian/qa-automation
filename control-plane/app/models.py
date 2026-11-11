@@ -40,6 +40,19 @@ class WorkflowSchedule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class ScheduleLog(Base):
+    __tablename__ = "schedule_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workflow_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("workflows.id"), index=True)
+    schedule_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    level: Mapped[str] = mapped_column(String(20), default="info")
+    message: Mapped[str] = mapped_column(Text, default="")
+    detail: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class TestRun(Base):
     __tablename__ = "test_runs"
 
@@ -48,6 +61,7 @@ class TestRun(Base):
     status: Mapped[str] = mapped_column(String(20), default="QUEUED", index=True)
     trigger: Mapped[str] = mapped_column(String(20), default="MANUAL")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    variation_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

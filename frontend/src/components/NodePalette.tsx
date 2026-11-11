@@ -1,4 +1,5 @@
 import { CATALOG, CLAUSE } from "../catalog";
+import { StepIcon } from "./StepIcon";
 
 const groups = [
   { id: "given", label: "Given", note: "setup" },
@@ -10,10 +11,10 @@ const groups = [
 export function NodePalette() {
   return (
     <aside className="panel w-56 shrink-0 overflow-auto border-r border-line p-3">
-      <p className="mark mb-3 text-[#d5e6f5]">Steps</p>
+      <p className="mark mb-3 text-[#999]">Steps</p>
       {groups.map((group) => (
         <div key={group.id} className="mb-4">
-          <p className="mb-1 text-[11px] text-[#f4f8fc]">{group.label} <span className="text-[#d5e6f5]">{group.note}</span></p>
+          <p className="mb-1 text-[11px] text-[#dcddde]">{group.label} <span className="text-[#999]">{group.note}</span></p>
           {CATALOG.filter((step) => (CLAUSE[step.type] || "when") === group.id).map((step) => (
             <button
               key={step.type}
@@ -22,14 +23,14 @@ export function NodePalette() {
                 event.dataTransfer.setData("application/blueprint-step", step.type);
                 event.dataTransfer.effectAllowed = "move";
               }}
-              className="mb-1 w-full border border-line bg-transparent px-2 py-1.5 text-left text-sm hover:border-[#f4f8fc]"
+              className="mb-1 flex w-full items-center gap-2 border border-line bg-transparent px-2 py-1.5 text-left text-sm hover:border-[#7f6df2]"
             >
+              <StepIcon type={step.type} />
               {step.title}
             </button>
           ))}
         </div>
       ))}
-      <p className="font-mono text-[10px] leading-4 text-[#d5e6f5]">Given sets the page. When acts. Then checks. White pins still order the steps.</p>
     </aside>
   );
 }

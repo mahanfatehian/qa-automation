@@ -51,6 +51,7 @@ export type Workflow = {
     maxSteps?: number;
     variables?: Record<string, unknown>;
     examples?: Array<Record<string, string>>;
+    dataColumns?: Array<{ name: string; type: "text" | "long" | "number" | "url" | "boolean" | "choice"; options?: string[] }>;
   };
   webhook_token: string;
   created_at: string;
@@ -74,6 +75,7 @@ export type TestRun = {
   status: string;
   trigger: string;
   error_message: string | null;
+  variation_label?: string | null;
   started_at: string | null;
   finished_at: string | null;
   created_at: string;

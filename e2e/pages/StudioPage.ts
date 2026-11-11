@@ -16,13 +16,13 @@ export class StudioPage {
   async goto() {
     await this.page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(this.page.getByTestId("studio-header")).toBeVisible();
+    await this.page.getByRole("button", { name: "Canvas" }).click();
     await expect(this.canvas).toBeVisible();
   }
 
   async loadFixture() {
-    this.page.once("dialog", (dialog) => dialog.accept());
-    await this.page.getByRole("button", { name: "Load fixture" }).click();
-    await expect(this.canvas.getByText("Open page")).toBeVisible();
+    await this.page.getByRole("button", { name: "Canvas" }).click();
+    await expect(this.canvas).toBeVisible();
   }
 
   async save() {

@@ -25,6 +25,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   status: () => request<{ database: boolean; redis: boolean; grid: { ready: boolean; node_count: number; message: string } }>("/api/v1/system/status"),
+  settings: () => request<{ browser_slots: number; ready_ms: number; window_width: number; window_height: number; grid?: { ready: boolean; nodes: number; slots: number } }>("/api/v1/settings"),
+  saveSettings: (body: { browser_slots: number; ready_ms: number; window_width: number; window_height: number }) =>
+    request<{ browser_slots: number; ready_ms: number; window_width: number; window_height: number; grid?: { ready: boolean; nodes: number; slots: number } }>("/api/v1/settings", { method: "PUT", body: JSON.stringify(body) }),
   workflows: () => request<Workflow[]>("/api/v1/workflows"),
   createWorkflow: (body: { name: string; description?: string; graph?: Workflow["graph"] }) =>
     request<Workflow>("/api/v1/workflows", { method: "POST", body: JSON.stringify(body) }),
@@ -34,12 +37,14 @@ export const api = {
   run: (id: string) => request<TestRun>(`/api/v1/workflows/${id}/run`, { method: "POST" }),
   rotateWebhook: (id: string) => request<Workflow>(`/api/v1/workflows/${id}/webhook/rotate`, { method: "POST" }),
   schedules: (id: string) => request<Schedule[]>(`/api/v1/workflows/${id}/schedules`),
+  automationLogs: (id: string) => request<Array<{ id: string; level: string; message: string; created_at: string }>>(`/api/v1/workflows/${id}/automation-logs`),
   createSchedule: (id: string, body: Partial<Schedule>) =>
     request<Schedule>(`/api/v1/workflows/${id}/schedules`, { method: "POST", body: JSON.stringify(body) }),
   updateSchedule: (id: string, body: Partial<Schedule>) =>
     request<Schedule>(`/api/v1/schedules/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   removeSchedule: (id: string) => request<void>(`/api/v1/schedules/${id}`, { method: "DELETE" }),
   runs: (workflowId: string) => request<TestRun[]>(`/api/v1/runs?workflow_id=${workflowId}`),
+  removeRun: (id: string) => request<void>(`/api/v1/runs/${id}`, { method: "DELETE" }),
   results: (runId: string) => request<NodeResult[]>(`/api/v1/runs/${runId}/results`),
   probe: (body: { url: string; strategy: string; query: string; timeout_seconds?: number }) =>
     request<{ ok: boolean; count: number; samples: string[]; error: string | null; screenshot_base64: string }>("/api/v1/tools/probe", {
@@ -97,6 +102,7 @@ export type InspectSession = {
   current_url: string;
   title: string;
   screenshot_base64: string;
+  screenshot_mime?: string;
   viewport: { width?: number; height?: number };
   error?: string;
 };
