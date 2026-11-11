@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>BlueprintQA fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 32px; }
+    #below { margin-top: 1400px; }
+    #hover-box { padding: 12px; background: #eee; }
+    #hover-box .secret { display: none; }
+    #hover-box:hover .secret { display: block; }
+    iframe { width: 320px; height: 120px; border: 1px solid #999; }
+  </style>
+</head>
+<body>
+  <h1>Blueprint lab</h1>
+  <p id="intro" data-testid="intro">Lab page is ready</p>
+  <input id="name" name="name" aria-label="Name" />
+  <button id="submit" type="button" onclick="document.getElementById('result').textContent = document.getElementById('name').value || 'submitted'">Submit</button>
+  <p id="result"></p>
+  <select id="color" data-testid="color">
+    <option value="">Choose</option>
+    <option value="blue">Blue</option>
+    <option value="green">Green</option>
+  </select>
+  <p id="color-out"></p>
+  <div id="hover-box">Hover here<span class="secret" id="hovered">hovered</span></div>
+  <button id="alert-btn" type="button" onclick="alert('lab-alert')">Open alert</button>
+  <p><a id="next" href="next.html">Next page</a></p>
+  <iframe id="frame" src="frame.html" title="lab frame"></iframe>
+  <input id="file" type="file" />
+  <div id="below">
+    <button id="lower" type="button" data-testid="lower" onclick="document.getElementById('lower-out').textContent = 'lower-clicked'">Lower button</button>
+    <p id="lower-out"></p>
+  </div>
+  <script>
+    document.getElementById("color").addEventListener("change", (event) => {
+      document.getElementById("color-out").textContent = event.target.value;
+    });
+    document.getElementById("name").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") document.getElementById("submit").click();
+    });
+  </script>
+</body>
+</html>

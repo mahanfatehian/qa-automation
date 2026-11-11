@@ -16,6 +16,12 @@ from app.validation import GraphError, validate_graph
 router = APIRouter(tags=["schedules"])
 
 
+def token_ok(expected: str, provided: str) -> bool:
+    if not expected or not provided or len(expected) != len(provided):
+        return False
+    return secrets.compare_digest(expected, provided)
+
+
 @router.get("/api/v1/workflows/{workflow_id}/schedules", response_model=list[ScheduleOut])
 async def list_schedules(workflow_id: UUID, db: AsyncSession = Depends(get_db)) -> list[WorkflowSchedule]:
     rows = (
@@ -96,7 +102,7 @@ async def trigger_webhook(
     db: AsyncSession = Depends(get_db),
 ) -> TestRun:
     workflow = await db.get(Workflow, workflow_id)
-    if workflow is None or not secrets.compare_digest(workflow.webhook_token, token):
+    if workflow is None or not token_ok(workflow.webhook_token, token):
         raise HTTPException(status_code=401, detail="Unknown blueprint or token")
     try:
         validate_graph(workflow.graph or {}, require_start=True)

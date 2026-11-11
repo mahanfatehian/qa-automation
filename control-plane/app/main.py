@@ -5,7 +5,10 @@ import secrets
 from contextlib import asynccontextmanager
 from uuid import UUID
 
+from pathlib import Path
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
@@ -73,6 +76,9 @@ app.include_router(workflows.router)
 app.include_router(schedules.router)
 app.include_router(runs.router)
 app.include_router(tools.router)
+fixtures = Path(__file__).resolve().parents[1] / "fixtures"
+if fixtures.is_dir():
+    app.mount("/fixtures", StaticFiles(directory=fixtures), name="fixtures")
 
 
 @app.exception_handler(GraphError)

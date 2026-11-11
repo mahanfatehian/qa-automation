@@ -2,9 +2,34 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from app.config import settings
-from app.schemas import ProbeIn
+from app.schemas import PickIn, ProbeIn
 
 router = APIRouter(prefix="/api/v1/tools", tags=["tools"])
+
+
+@router.post("/pick")
+async def pick(body: PickIn) -> dict:
+    payload = {
+        "url": body.url,
+        "browser": body.browser,
+        "headless": body.headless,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=90) as client:
+            response = await client.post(f"{settings.runner_url.rstrip('/')}/internal/pick", json=payload)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail=f"Runner is not reachable: {exc}") from exc
+    data = response.json()
+    page = data.get("page") or {}
+    return {
+        "ok": bool(data.get("ok")),
+        "current_url": data.get("currentUrl") or "",
+        "title": data.get("title") or "",
+        "screenshot_base64": data.get("screenshotBase64") or "",
+        "viewport": page.get("viewport") or {},
+        "elements": page.get("elements") or [],
+        "error": data.get("error"),
+    }
 
 
 @router.post("/probe")

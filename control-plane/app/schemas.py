@@ -86,6 +86,12 @@ class NodeResultOut(BaseModel):
     created_at: datetime
 
 
+class PickIn(BaseModel):
+    url: str
+    browser: str = "chrome"
+    headless: bool = True
+
+
 class ProbeIn(BaseModel):
     url: str
     strategy: str = "XPATH"

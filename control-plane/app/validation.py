@@ -29,6 +29,16 @@ KNOWN_TYPES = {
     "LOOP_ELEMENTS",
     "WAIT",
     "ASSERT",
+    "SCROLL",
+    "HOVER",
+    "SELECT_OPTION",
+    "PRESS_KEY",
+    "ENTER_FRAME",
+    "LEAVE_FRAME",
+    "SWITCH_TAB",
+    "ALERT",
+    "UPLOAD",
+    "GO_BACK",
 }
 
 

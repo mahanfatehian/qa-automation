@@ -1,0 +1,30 @@
+package com.blueprintqa.runner.nodes;
+
+import com.blueprintqa.runner.engine.ExecutionContext;
+import com.blueprintqa.runner.model.GraphNode;
+import com.blueprintqa.runner.model.NodeOutput;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+
+@Component
+public class GoBackNodeHandler implements NodeHandler {
+    @Override
+    public String type() {
+        return "GO_BACK";
+    }
+
+    @Override
+    public NodeOutput execute(GraphNode node, ExecutionContext context) {
+        context.driver().navigate().back();
+        new WebDriverWait(context.driver(), Duration.ofSeconds(node.integer("timeoutSeconds", 15))).until(driver ->
+                "complete".equals(((JavascriptExecutor) driver).executeScript("return document.readyState"))
+        );
+        String url = context.driver().getCurrentUrl();
+        NodeOutput output = NodeOutput.pass(url);
+        output.pins.put("text_out", url);
+        return output;
+    }
+}
