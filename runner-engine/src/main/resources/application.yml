@@ -1,0 +1,19 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: blueprintqa-runner
+  threads:
+    virtual:
+      enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      timeout: 10s
+
+blueprintqa:
+  selenium-grid-url: ${SELENIUM_GRID_URL:http://selenium-hub:4444}
+  queue: queue:workflow_jobs
+  telemetry-channel: telemetry:workflow_events
