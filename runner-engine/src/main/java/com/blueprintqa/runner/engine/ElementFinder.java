@@ -63,10 +63,11 @@ public class ElementFinder {
             let re;
             try { re = new RegExp(String(arguments[0] || ''), 'i'); }
             catch (e) { return null; }
-            const state = { el: null, len: Infinity };
+            const state = { el: null, len: Infinity, seen: 0 };
             const visit = (root) => {
-              if (!root || !root.querySelectorAll) return;
+              if (!root || !root.querySelectorAll || state.seen > 4000) return;
               for (const el of root.querySelectorAll('*')) {
+                if (state.seen++ > 4000) return;
                 const text = (el.innerText || el.textContent || '').trim();
                 if (text && re.test(text) && text.length < state.len) {
                   state.el = el;
