@@ -19,12 +19,14 @@ public final class Pointer {
 
     public static String click(WebDriver driver, WebElement element, ExecutionContext context) {
         String before = url(driver);
-        long beforeMut = mark(driver);
         boolean beforeChecked = checked(driver, element);
         scroll(driver, element);
         aim(driver, element);
+        long beforeMut = mark(driver);
         try {
-            new WebDriverWait(driver, Duration.ofSeconds(4)).until(ExpectedConditions.elementToBeClickable(element));
+            if (!element.isDisplayed()) {
+                new WebDriverWait(driver, Duration.ofMillis(400)).until(ExpectedConditions.elementToBeClickable(element));
+            }
         } catch (Exception ignored) {
             // still try the click; a covered control is handled below
         }
@@ -43,6 +45,13 @@ public final class Pointer {
         jsClick(driver, element);
         if (changed(driver, element, before, beforeMut, beforeChecked)) {
             return accepted(driver, before, context);
+        }
+        WebElement parent = clickableParent(driver, element);
+        if (parent != null && parent != element) {
+            jsClick(driver, parent);
+            if (changed(driver, element, before, beforeMut, beforeChecked) || changed(driver, parent, before, beforeMut, beforeChecked)) {
+                return accepted(driver, before, context);
+            }
         }
         throw new IllegalStateException("Click did not land. The control was found, but the page did not react.");
     }
@@ -278,11 +287,32 @@ public final class Pointer {
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center', inline:'nearest'});", element);
     }
 
+    private static WebElement clickableParent(WebDriver driver, WebElement element) {
+        try {
+            Object found = ((JavascriptExecutor) driver).executeScript("""
+                    const start = arguments[0];
+                    let node = start && start.parentElement;
+                    for (let i = 0; node && i < 4; i++, node = node.parentElement) {
+                      const tag = node.tagName;
+                      if (tag === 'BUTTON' || tag === 'A' || node.getAttribute('role') === 'button' || node.getAttribute('data-testid') || node.getAttribute('data-cro-id')) {
+                        return node;
+                      }
+                    }
+                    return null;
+                    """, element);
+            return found instanceof WebElement parent ? parent : null;
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
     private static void jsClick(WebDriver driver, WebElement element) {
         ((JavascriptExecutor) driver).executeScript("""
                 const el = arguments[0];
-                el.focus && el.focus();
-                el.click();
+                const fire = (type) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, view: window }));
+                try { fire('pointerdown'); fire('pointerup'); } catch (e) {}
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                if (el.click) el.click();
                 """, element);
     }
 
