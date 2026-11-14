@@ -4,6 +4,7 @@ import com.blueprintqa.runner.config.SeleniumConfig;
 import com.blueprintqa.runner.model.GraphNode;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.PageLoadStrategy;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxOptions;
@@ -41,6 +42,7 @@ public class SeleniumFactory {
                 driver.manage().timeouts().implicitlyWait(Duration.ZERO);
                 driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(20));
                 driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(8));
+                rememberErrors(driver);
                 try {
                     driver.manage().window().setSize(new Dimension(width, height));
                 } catch (Exception ignored) {
@@ -91,6 +93,22 @@ public class SeleniumFactory {
             url = url.substring(0, url.length() - 1);
         }
         return url;
+    }
+
+    private void rememberErrors(WebDriver driver) {
+        String source = "window.__bpErrors=window.__bpErrors||[];if(!window.__bpHeard){window.__bpHeard=1;window.addEventListener('error',e=>{window.__bpErrors.push(String(e.message||'').slice(0,160));});}";
+        try {
+            if (driver instanceof org.openqa.selenium.chromium.HasCdp cdp) {
+                cdp.executeCdpCommand("Page.addScriptToEvaluateOnNewDocument", java.util.Map.of("source", source));
+            }
+        } catch (Exception ignored) {
+            // a grid node that cannot install a document script still runs the test
+        }
+        try {
+            ((JavascriptExecutor) driver).executeScript(source);
+        } catch (Exception ignored) {
+            // the page may still be blank
+        }
     }
 
     private void sleep(long millis) {

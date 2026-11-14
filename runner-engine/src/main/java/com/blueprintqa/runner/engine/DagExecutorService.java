@@ -7,6 +7,7 @@ import com.blueprintqa.runner.model.WorkflowJob;
 import com.blueprintqa.runner.nodes.NodeRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -68,7 +69,7 @@ public class DagExecutorService {
             telemetry.publish(job, "RUN_COMPLETED", "", "", 0, "Blueprint passed", "", Map.of(), screenshot(driver));
         } catch (Exception ex) {
             log.warn("blueprint {} failed: {}", job.runId, ex.getMessage());
-            telemetry.publish(job, "RUN_FAILED", "", "", 0, friendly(ex), stack(ex), Map.of(), screenshot(driver));
+            telemetry.publish(job, "RUN_FAILED", "", "", 0, withConsole(driver, friendly(ex)), stack(ex), Map.of(), screenshot(driver));
         } finally {
             if (driver != null) {
                 sessions.remove(driver);
@@ -213,7 +214,7 @@ public class DagExecutorService {
             }
             output = registry.get(node.semanticType()).execute(node, context);
         } catch (Exception ex) {
-            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), branched(context, friendly(ex)), stack(ex), stepDetail(node, context, Map.of()), shotFor(node, context.driver(), true));
+            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), branched(context, withConsole(context.driver(), friendly(ex))), stack(ex), stepDetail(node, context, Map.of()), shotFor(node, context.driver(), true));
             throw new IllegalStateException(where(context) + friendly(ex), ex);
         }
         store(node, output, context);
@@ -553,6 +554,23 @@ public class DagExecutorService {
             return cursor.getClass().getSimpleName();
         }
         return message.length() > 1500 ? message.substring(0, 1500) : message;
+    }
+
+    private String withConsole(WebDriver driver, String message) {
+        if (driver == null) {
+            return message;
+        }
+        try {
+            Object raw = ((JavascriptExecutor) driver).executeScript("return (window.__bpErrors || []).slice(-3).join(' | ')");
+            String extra = raw == null ? "" : String.valueOf(raw).trim();
+            if (extra.isBlank()) {
+                return message;
+            }
+            String joined = message + " · browser: " + extra;
+            return joined.length() > 1500 ? joined.substring(0, 1500) : joined;
+        } catch (Exception ex) {
+            return message;
+        }
     }
 
     private String stack(Exception ex) {
