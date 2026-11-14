@@ -25,6 +25,9 @@ public class VerifyNodeHandler implements NodeHandler {
     public NodeOutput execute(GraphNode node, ExecutionContext context) {
         String check = node.str("check", "VISIBLE").toUpperCase();
         String expected = context.interpolate(node.str("expected", ""));
+        if (check.equals("URL_EQUALS") || check.equals("URL_CONTAINS") || check.equals("TITLE_CONTAINS")) {
+            return pollPage(node, context, check, expected);
+        }
         String actual;
         boolean passed = switch (check) {
             case "ENABLED" -> {
@@ -79,6 +82,39 @@ public class VerifyNodeHandler implements NodeHandler {
         output.pins.put("bool_out", true);
         output.pins.put("text_out", actual);
         return output;
+    }
+
+    private NodeOutput pollPage(GraphNode node, ExecutionContext context, String check, String expected) {
+        int seconds = Math.max(1, node.integer("timeoutSeconds", 8));
+        long deadline = System.nanoTime() + seconds * 1_000_000_000L;
+        String actual = "";
+        while (System.nanoTime() < deadline) {
+            actual = switch (check) {
+                case "URL_EQUALS", "URL_CONTAINS" -> context.driver().getCurrentUrl();
+                default -> {
+                    String title = context.driver().getTitle();
+                    yield title == null ? "" : title;
+                }
+            };
+            boolean passed = switch (check) {
+                case "URL_EQUALS" -> actual.equals(expected);
+                case "TITLE_CONTAINS" -> actual.contains(expected);
+                default -> actual.contains(expected);
+            };
+            if (passed) {
+                NodeOutput output = NodeOutput.pass(check + " passed: " + actual);
+                output.pins.put("bool_out", true);
+                output.pins.put("text_out", actual);
+                return output;
+            }
+            try {
+                Thread.sleep(200L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        throw new AssertionError("Verify failed: " + check + " expected [" + expected + "] but was [" + actual + "]");
     }
 
     private String textOf(GraphNode node, ExecutionContext context) {
