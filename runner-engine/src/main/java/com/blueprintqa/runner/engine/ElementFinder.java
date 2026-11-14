@@ -80,16 +80,75 @@ public class ElementFinder {
             return state.el;
             """;
 
+    private static final String ROLE_SCRIPT = """
+            const raw = String(arguments[0] || '');
+            const cut = raw.indexOf('|');
+            const wantRole = (cut < 0 ? raw : raw.slice(0, cut)).trim().toLowerCase();
+            const wantName = (cut < 0 ? '' : raw.slice(cut + 1)).trim().toLowerCase();
+            const roleOf = (el) => {
+              const explicit = (el.getAttribute('role') || '').toLowerCase();
+              if (explicit) return explicit;
+              const tag = el.tagName.toLowerCase();
+              if (tag === 'a' && el.hasAttribute('href')) return 'link';
+              if (tag === 'button') return 'button';
+              if (tag === 'textarea') return 'textbox';
+              if (tag === 'select') return 'combobox';
+              if (tag === 'img') return 'img';
+              if (tag === 'input') {
+                const type = (el.getAttribute('type') || 'text').toLowerCase();
+                if (type === 'checkbox') return 'checkbox';
+                if (type === 'radio') return 'radio';
+                if (type === 'submit' || type === 'button') return 'button';
+                return 'textbox';
+              }
+              return '';
+            };
+            const accName = (el) => {
+              const aria = el.getAttribute('aria-label');
+              if (aria) return aria.trim();
+              const title = el.getAttribute('title') || el.getAttribute('alt') || el.getAttribute('name') || '';
+              if (title.trim()) return title.trim();
+              return (el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+            };
+            const matches = (el) => {
+              const role = roleOf(el);
+              const name = accName(el).toLowerCase();
+              if (wantRole && wantRole !== '*' && role !== wantRole) return false;
+              if (wantName && !name.includes(wantName)) return false;
+              return !!(wantRole || wantName);
+            };
+            let best = null;
+            let bestArea = Infinity;
+            let seen = 0;
+            const visit = (root) => {
+              if (!root || !root.querySelectorAll || seen > 4000) return;
+              for (const el of root.querySelectorAll('*')) {
+                if (seen++ > 4000) return;
+                if (!matches(el)) {
+                  if (el.shadowRoot) visit(el.shadowRoot);
+                  continue;
+                }
+                const box = el.getBoundingClientRect();
+                const area = Math.max(1, box.width * box.height);
+                if (area < bestArea) { best = el; bestArea = area; }
+                if (el.shadowRoot) visit(el.shadowRoot);
+              }
+            };
+            visit(document);
+            return best;
+            """;
+
     public WebElement hit(WebDriver driver, String strategy, String query) {
         if (query == null || query.isBlank()) {
             return null;
         }
         String kind = strategy == null ? "XPATH" : strategy.trim().toUpperCase(Locale.ROOT);
         try {
-            if ("CSS".equals(kind) || "TEXT_CONTAINS".equals(kind) || "REGEX_DOM".equals(kind)) {
+            if ("CSS".equals(kind) || "TEXT_CONTAINS".equals(kind) || "REGEX_DOM".equals(kind) || "ROLE".equals(kind)) {
                 String script = switch (kind) {
                     case "TEXT_CONTAINS" -> TEXT_SCRIPT;
                     case "REGEX_DOM" -> REGEX_SCRIPT;
+                    case "ROLE" -> ROLE_SCRIPT;
                     default -> CSS_SCRIPT;
                 };
                 Object found = ((JavascriptExecutor) driver).executeScript(script, query);
@@ -127,6 +186,9 @@ public class ElementFinder {
         try {
             if ("CSS".equals(kind)) {
                 return waitJs(driver, timeout, CSS_SCRIPT, query);
+            }
+            if ("ROLE".equals(kind)) {
+                return waitJs(driver, timeout, ROLE_SCRIPT, query);
             }
             By by = by(kind, query);
             if (by == null) {

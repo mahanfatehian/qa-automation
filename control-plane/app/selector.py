@@ -181,6 +181,9 @@ def _from_fingerprint(fingerprint: dict) -> list[dict]:
     if testid:
         add("CSS", f'[data-testid="{_q(testid)}"]', 1)
     name = str(exact.get("name") or "")
+    role = str(exact.get("role") or "")
+    if name or role:
+        add("ROLE", f"{role or '*'}|{name}", 1)
     if name:
         add("CSS", f'{tag}[name="{_q(name)}"]', 2)
     cro = str(exact.get("cro") or "")

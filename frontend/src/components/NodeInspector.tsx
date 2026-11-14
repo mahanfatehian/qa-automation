@@ -199,6 +199,7 @@ export function NodeInspector({ node, dataColumns, rows, onChange, onProbe, onPi
 }
 
 const FIND_BY = [
+  ["ROLE", "Role and name"],
   ["XPATH", "XPath"],
   ["CSS", "CSS"],
   ["CLASS", "Class"],

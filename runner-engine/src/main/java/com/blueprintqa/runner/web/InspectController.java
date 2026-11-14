@@ -85,6 +85,10 @@ public class InspectController {
               for (const opt of node.options) options.push({ text: opt.text, value: opt.value });
             }
             const selectors = [];
+            const acc = (node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('alt') || node.getAttribute('name') || '').trim();
+            const explicitRole = (node.getAttribute('role') || '').toLowerCase();
+            const implied = explicitRole || (tag === 'a' ? 'link' : tag === 'button' ? 'button' : tag === 'img' ? 'img' : '');
+            if (acc) selectors.push({ kind: 'ROLE', value: (implied || '*') + '|' + acc.replace(/\|/g, ' ') });
             const testid = node.getAttribute('data-testid') || node.getAttribute('data-test');
             const cro = node.getAttribute('data-cro-id') || '';
             if (testid) selectors.push({ kind: 'CSS', value: '[data-testid="' + testid.replace(/"/g, '') + '"]' });
@@ -132,6 +136,7 @@ public class InspectController {
               tag, type, kind, text, name: name || '', id: node.id || '',
               placeholder: node.getAttribute('placeholder') || '',
               aria: node.getAttribute('aria-label') || '',
+              role: implied || '',
               x: rect.x, y: rect.y, width: rect.width, height: rect.height,
               options, selectors, suggested, path
             };

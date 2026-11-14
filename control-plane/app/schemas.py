@@ -117,6 +117,7 @@ class InspectResolveIn(BaseModel):
     tag: str = ""
     id: str = ""
     name: str = ""
+    role: str = ""
     text: str = ""
     aria: str = ""
     placeholder: str = ""

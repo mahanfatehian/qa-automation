@@ -39,5 +39,12 @@ class SelectorTests(unittest.TestCase):
                 ],
             },
         )
-        self.assertEqual(ranked[0]["value"], 'dds-icon[name="action-delete"]')
+        self.assertEqual(ranked[0]["kind"], "ROLE")
+        self.assertEqual(ranked[0]["value"], "*|action-delete")
+        self.assertTrue(any(item["value"] == 'dds-icon[name="action-delete"]' for item in ranked))
         self.assertFalse(any(item["value"] == '[data-testid="quantity-box"]' for item in ranked))
+
+    def test_role_locator_uses_the_elements_own_name(self) -> None:
+        ranked = synthesize("", {"tag": "dds-icon", "name": "action-delete", "role": "", "path": []})
+        self.assertEqual(ranked[0]["kind"], "ROLE")
+        self.assertEqual(ranked[0]["value"], "*|action-delete")

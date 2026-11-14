@@ -24,7 +24,7 @@ export const CATALOG: StepDef[] = [
     type: "SEARCH_ELEMENT",
     title: "Find element",
     category: "search",
-    hint: "Waits for an element by XPath, CSS, text, or a regex.",
+    hint: "Waits for an element by role and name, CSS, XPath, or text.",
     pins: [execIn, execOut, { id: "element_out", label: "element", kind: "element", direction: "out" }],
     defaults: { strategy: "XPATH", query: "", timeoutSeconds: 10 },
   },
