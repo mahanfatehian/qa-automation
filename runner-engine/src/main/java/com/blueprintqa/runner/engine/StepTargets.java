@@ -68,7 +68,7 @@ public final class StepTargets {
                 }
             }
             try {
-                Thread.sleep(200L);
+                Thread.sleep(System.nanoTime() + 1_200_000_000L < deadline ? 80L : 200L);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 break;
