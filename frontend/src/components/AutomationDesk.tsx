@@ -34,7 +34,7 @@ export function AutomationDesk({ workflowId, workflowName, webhookToken, runs, a
       api.automationLogs(workflowId).then((rows) => { if (!stop) setLogs(rows); }).catch(() => undefined);
     };
     load();
-    const timer = window.setInterval(load, 4000);
+    const timer = window.setInterval(load, 2000);
     return () => { stop = true; window.clearInterval(timer); };
   }, [workflowId]);
 

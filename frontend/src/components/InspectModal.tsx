@@ -87,7 +87,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
       api.inspectHover(sessionId.current, x, y).then((result) => {
         if (result.ok && result.element) setElement(result.element);
       }).catch(() => undefined);
-    }, 120);
+    }, 60);
   }
 
   function lock() {

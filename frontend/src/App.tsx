@@ -162,7 +162,7 @@ export function App() {
         if (live) setRun((current) => current && current.id === live.id ? { ...current, status: live.status, error_message: live.error_message } : current);
       }).catch(() => undefined);
     };
-    const timer = window.setInterval(tick, 4000);
+    const timer = window.setInterval(tick, 2000);
     return () => window.clearInterval(timer);
   }, [activeId]);
 
