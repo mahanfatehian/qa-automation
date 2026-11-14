@@ -26,3 +26,18 @@ class SelectorTests(unittest.TestCase):
     def test_dynamic_id_is_not_trusted(self) -> None:
         ranked = synthesize("", {"tag": "div", "id": "react-123456", "path": []})
         self.assertFalse(any(item["kind"] == "ID" for item in ranked))
+
+    def test_exact_named_element_beats_an_ancestor_testid(self) -> None:
+        ranked = synthesize(
+            "",
+            {
+                "tag": "dds-icon",
+                "name": "action-delete",
+                "path": [
+                    {"tag": "div", "nth": 1, "testid": "quantity-box"},
+                    {"tag": "dds-icon", "nth": 1, "name": "action-delete"},
+                ],
+            },
+        )
+        self.assertEqual(ranked[0]["value"], 'dds-icon[name="action-delete"]')
+        self.assertFalse(any(item["value"] == '[data-testid="quantity-box"]' for item in ranked))

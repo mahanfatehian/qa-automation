@@ -156,7 +156,7 @@ export function InspectModal({ open, nodes, edges, stopBefore, onClose, onUse }:
             {!element && <p className="text-[#8ea6bb]">Hover the page.</p>}
             {element && (
               <>
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8ea6bb]">{locked ? "Locked" : "Hover"} · {element.kind}</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8ea6bb]">{locked ? "Locked" : "Hover"} · {element.tag}{element.name ? `[name=${element.name}]` : ""}</p>
                 <p className="mt-1 text-[#e8f0f7]">{element.text || element.placeholder || element.tag}</p>
                 {element.options?.length > 0 && (
                   <ul className="mt-2 text-xs text-[#9ad8ff]">

@@ -39,21 +39,33 @@ public class InspectController {
               if (area > 8 && area < bestArea) { node = candidate; bestArea = area; }
             }
             if (!node) return null;
+            const named = (n) => {
+              if (!n || !n.tagName) return false;
+              const tag = n.tagName.toLowerCase();
+              if (tag.includes('-')) return true;
+              return !!(n.id || n.getAttribute('name') || n.getAttribute('data-testid') || n.getAttribute('data-test') || n.getAttribute('data-cro-id') || n.getAttribute('aria-label'));
+            };
             let pierce = 0;
-            while (node.shadowRoot && pierce++ < 5) {
+            while (node.shadowRoot && pierce++ < 4) {
               const inner = node.shadowRoot.elementFromPoint(x, y);
               if (!inner || inner === node) break;
+              if (!named(inner) && named(node)) break;
               node = inner;
             }
-            const interesting = (n) => {
-              const tag = n.tagName.toLowerCase();
-              const type = (n.getAttribute('type') || '').toLowerCase();
-              return ['a','button','input','select','textarea','label'].includes(tag) || n.getAttribute('role') === 'button' || type === 'checkbox' || type === 'radio';
+            const childAt = (parent) => {
+              if (!parent || !parent.children) return null;
+              const kids = [...parent.children].filter((child) => {
+                const box = child.getBoundingClientRect();
+                return box.width > 4 && box.height > 4 && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+              });
+              const namedKids = kids.filter(named);
+              return namedKids.length === 1 ? namedKids[0] : null;
             };
-            for (let i = 0; i < 3 && node.parentElement && !interesting(node); i++) {
-              const parent = node.parentElement;
-              if (!parent.tagName || parent.tagName === 'HTML' || parent.tagName === 'BODY') break;
-              node = parent;
+            let down = 0;
+            while (down++ < 3) {
+              const inner = childAt(node);
+              if (!inner || inner === node) break;
+              node = inner;
             }
             const tag = node.tagName.toLowerCase();
             const type = (node.getAttribute('type') || '').toLowerCase();
@@ -74,7 +86,11 @@ public class InspectController {
             }
             const selectors = [];
             const testid = node.getAttribute('data-testid') || node.getAttribute('data-test');
+            const cro = node.getAttribute('data-cro-id') || '';
             if (testid) selectors.push({ kind: 'CSS', value: '[data-testid="' + testid.replace(/"/g, '') + '"]' });
+            const elName = node.getAttribute('name') || '';
+            if (elName) selectors.push({ kind: 'CSS', value: tag + '[name="' + elName.replace(/"/g, '') + '"]' });
+            if (cro) selectors.push({ kind: 'CSS', value: '[data-cro-id="' + cro.replace(/"/g, '') + '"]' });
             if (node.id) selectors.push({ kind: 'ID', value: node.id });
             const name = node.getAttribute('name');
             if (name) selectors.push({ kind: 'NAME', value: name });
@@ -84,7 +100,7 @@ public class InspectController {
             if (kind === 'select') suggested.push('SELECT_OPTION');
             if (kind === 'checkbox' || kind === 'radio') suggested.push('SET_CHECKBOX');
             if (kind === 'text-input' || kind === 'password' || kind === 'textarea') suggested.push('TYPE_TEXT');
-            if (kind === 'button' || kind === 'link') suggested.push('CLICK');
+            if (kind === 'button' || kind === 'link' || elName || testid || cro || tag.includes('-')) suggested.push('CLICK');
             if (kind === 'file') suggested.push('UPLOAD');
             suggested.push('VERIFY', 'SEARCH_ELEMENT');
             const path = [];
@@ -104,6 +120,7 @@ public class InspectController {
                 id: cursor.id || '',
                 name: cursor.getAttribute('name') || '',
                 testid: cursor.getAttribute('data-testid') || cursor.getAttribute('data-test') || cursor.getAttribute('data-cy') || cursor.getAttribute('data-qa') || '',
+                cro: cursor.getAttribute('data-cro-id') || '',
                 type: (cursor.getAttribute('type') || '').toLowerCase(),
                 aria: cursor.getAttribute('aria-label') || '',
                 placeholder: cursor.getAttribute('placeholder') || '',

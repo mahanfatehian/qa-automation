@@ -172,26 +172,29 @@ def _from_fingerprint(fingerprint: dict) -> list[dict]:
         seen.add(key)
         ranked.append({"kind": kind, "value": value, "rank": rank})
 
-    sources = []
     path = fingerprint.get("path") or []
-    if isinstance(path, list):
-        sources.extend(item for item in path if isinstance(item, dict))
-    sources.append(fingerprint)
-    for source in reversed(sources):
-        tag = str(source.get("tag") or fingerprint.get("tag") or "*").lower() or "*"
-        add("CSS", f'[data-testid="{_q(str(source.get("testid") or ""))}"]' if source.get("testid") else "", 1)
-        name = str(source.get("name") or "")
-        if name:
-            add("CSS", f'{tag}[name="{_q(name)}"]', 2)
-        aria = str(source.get("aria") or "")
-        if aria:
-            add("CSS", f'{tag}[aria-label="{_q(aria)}"]', 3)
-        placeholder = str(source.get("placeholder") or "")
-        if placeholder:
-            add("CSS", f'{tag}[placeholder="{_q(placeholder)}"]', 4)
-        element_id = str(source.get("id") or "")
-        if _stable_id(element_id):
-            add("ID", element_id, 6)
+    exact = fingerprint if fingerprint.get("tag") else {}
+    if not exact.get("tag") and isinstance(path, list) and path and isinstance(path[-1], dict):
+        exact = path[-1]
+    tag = str(exact.get("tag") or "*").lower() or "*"
+    testid = str(exact.get("testid") or "")
+    if testid:
+        add("CSS", f'[data-testid="{_q(testid)}"]', 1)
+    name = str(exact.get("name") or "")
+    if name:
+        add("CSS", f'{tag}[name="{_q(name)}"]', 2)
+    cro = str(exact.get("cro") or "")
+    if cro:
+        add("CSS", f'[data-cro-id="{_q(cro)}"]', 2)
+    aria = str(exact.get("aria") or "")
+    if aria:
+        add("CSS", f'{tag}[aria-label="{_q(aria)}"]', 3)
+    placeholder = str(exact.get("placeholder") or "")
+    if placeholder:
+        add("CSS", f'{tag}[placeholder="{_q(placeholder)}"]', 4)
+    element_id = str(exact.get("id") or "")
+    if _stable_id(element_id):
+        add("ID", element_id, 6)
     path_css = _path_css(path if isinstance(path, list) else [])
     if path_css:
         add("CSS", path_css, 8)
