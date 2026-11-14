@@ -196,7 +196,7 @@ public final class Pointer {
     public static void settleForShot(WebDriver driver) {
         long start = System.currentTimeMillis();
         int steady = 0;
-        while (System.currentTimeMillis() - start < 10000L) {
+        while (System.currentTimeMillis() - start < 6000L) {
             if (frameReady(driver)) {
                 steady++;
                 if (steady >= 2) {
@@ -240,7 +240,7 @@ public final class Pointer {
         } catch (Exception ignored) {
             // a site that never finishes loading can still be acted on; the shot must not be the spinner
         }
-        int cap = Math.max(6000, Math.min(12000, Math.max(GridBudget.readyMs, 6000)));
+        int cap = Math.min(2000, Math.max(400, GridBudget.readyMs));
         long start = System.currentTimeMillis();
         int steady = 0;
         while (System.currentTimeMillis() - start < cap) {
