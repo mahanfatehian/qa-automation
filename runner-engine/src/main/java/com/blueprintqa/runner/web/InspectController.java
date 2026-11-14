@@ -88,7 +88,7 @@ public class InspectController {
             const acc = (node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('alt') || node.getAttribute('name') || '').trim();
             const explicitRole = (node.getAttribute('role') || '').toLowerCase();
             const implied = explicitRole || (tag === 'a' ? 'link' : tag === 'button' ? 'button' : tag === 'img' ? 'img' : '');
-            if (acc) selectors.push({ kind: 'ROLE', value: (implied || '*') + '|' + acc.replace(/\|/g, ' ') });
+            if (acc) selectors.push({ kind: 'ROLE', value: (implied || '*') + '|' + acc.split('|').join(' ') });
             const testid = node.getAttribute('data-testid') || node.getAttribute('data-test');
             const cro = node.getAttribute('data-cro-id') || '';
             if (testid) selectors.push({ kind: 'CSS', value: '[data-testid="' + testid.replace(/"/g, '') + '"]' });
