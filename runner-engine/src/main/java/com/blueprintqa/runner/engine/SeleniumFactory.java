@@ -39,8 +39,8 @@ public class SeleniumFactory {
             try {
                 WebDriver driver = connect(browser, headless, width, height, sessionName);
                 driver.manage().timeouts().implicitlyWait(Duration.ZERO);
-                driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(60));
-                driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(30));
+                driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(20));
+                driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(8));
                 try {
                     driver.manage().window().setSize(new Dimension(width, height));
                 } catch (Exception ignored) {
