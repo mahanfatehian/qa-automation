@@ -41,7 +41,7 @@ async def inspect_hover(session_id: str, body: InspectHoverIn) -> dict:
         response = await _runner.post(
             f"{settings.runner_url.rstrip('/')}/internal/inspect/{session_id}/hover",
             json={"x": body.x, "y": body.y},
-            timeout=3,
+            timeout=8,
         )
         data = response.json()
     except httpx.HTTPError as exc:
