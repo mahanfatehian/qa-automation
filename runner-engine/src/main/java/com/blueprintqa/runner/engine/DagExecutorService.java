@@ -213,7 +213,7 @@ public class DagExecutorService {
             }
             output = registry.get(node.semanticType()).execute(node, context);
         } catch (Exception ex) {
-            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), branched(context, friendly(ex)), stack(ex), stepDetail(node, context, Map.of()), screenshot(context.driver()));
+            telemetry.publish(job, "NODE_FAILED", node.id, node.semanticType(), elapsed(started), branched(context, friendly(ex)), stack(ex), stepDetail(node, context, Map.of()), shotFor(node, context.driver(), true));
             throw new IllegalStateException(where(context) + friendly(ex), ex);
         }
         store(node, output, context);
@@ -223,7 +223,7 @@ public class DagExecutorService {
         if (next.size() > 1) {
             note = (note.isBlank() ? "" : note + " · ") + "forked " + next.size() + " browsers";
         }
-        telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), branched(context, note), "", stepDetail(node, context, output.pins), screenshot(context.driver()));
+        telemetry.publish(job, "NODE_PASSED", node.id, node.semanticType(), elapsed(started), branched(context, note), "", stepDetail(node, context, output.pins), shotFor(node, context.driver(), false));
         dispatch(next, job, context, steps);
     }
 
@@ -487,6 +487,14 @@ public class DagExecutorService {
 
     private long elapsed(long started) {
         return Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
+    }
+
+    private String shotFor(GraphNode node, WebDriver driver, boolean failed) {
+        String type = node.semanticType();
+        if (!failed && ("START".equals(type) || "WAIT".equals(type) || "READ_TITLE".equals(type) || "READ_URL".equals(type) || "READ_TEXT".equals(type))) {
+            return "";
+        }
+        return screenshot(driver);
     }
 
     private String screenshot(WebDriver driver) {
